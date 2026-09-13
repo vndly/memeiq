@@ -1,0 +1,7 @@
+{
+  "projects": {
+    "default": "meme-iq",
+    "local": "meme-iq",
+    "remote": "meme-iq"
+  }
+}

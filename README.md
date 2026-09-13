@@ -1,2 +1,1 @@
-# memeiq
-Meme IQ
+# Meme IQ
