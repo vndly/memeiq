@@ -34,7 +34,7 @@ Meme IQ (Vite + Vue 3, TypeScript, Composition API with `<script setup>`, ESLint
 
 - **TypeScript projects**: `tsconfig.json` references `tsconfig.app.json` (browser, `src/`, extends `@vue/tsconfig/tsconfig.dom.json`) and `tsconfig.node.json` (`vite.config.ts`, extends `@tsconfig/node24`). An option not covered in bases must be set in both.
 - **Fonts**: Served by Google Fonts CDN ('Anton', 'Azeret Mono', 'Instrument Sans') via `<link>` in `index.html`. No font packages in `package.json` and no font files in the repo.
-- **Images**: Import assets from `src/assets/` so Vite fingerprints them; nothing goes in `public/`.
+- **Static assets**: Import assets from `src/assets/` (including static data via `?url`) so Vite fingerprints them; nothing goes in `public/`.
 
 ## Deployment
 
