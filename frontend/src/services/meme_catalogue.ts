@@ -50,3 +50,27 @@ export async function fetchMemeCatalogue(): Promise<Meme[]> {
     return []
   }
 }
+
+/**
+ * Picks random distinct memes from the catalogue.
+ * @param count - The number of memes to pick.
+ * @returns An array of randomly selected memes.
+ */
+export function pickRandomMemes(count: number): Meme[] {
+  const memesPool = [...memeCatalogue.value]
+  if (memesPool.length <= count) {
+    return memesPool
+  }
+
+  for (let i = memesPool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    const itemAtI = memesPool[i]
+    const itemAtJ = memesPool[j]
+    if (itemAtI !== undefined && itemAtJ !== undefined) {
+      memesPool[i] = itemAtJ
+      memesPool[j] = itemAtI
+    }
+  }
+
+  return memesPool.slice(0, count)
+}
