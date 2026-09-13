@@ -7,7 +7,7 @@ Meme IQ (Vite + Vue 3, TypeScript, Composition API with `<script setup>`, ESLint
 - `components/screens/` — the routed screens (`main_screen.vue`, `match_screen.vue`).
 - `components/` — shared presentational and UI components.
 - `firebase.ts` — Firebase initialization (App, Firestore via `getFirestore`, Auth via `getAuth`).
-- `assets/styles.css` — global design tokens (`--ground`, `--panel`, `--text-main`, `--text-dim`, `--accent`, `--font-ui`, `--font-mono`) and reset. All component styles are scoped (`<style scoped>`).
+- `assets/styles.css` — global design tokens (`--ground`, `--panel`, `--text-main`, `--text-dim`, `--accent`, `--font-ui`, `--font-mono`, `--font-display`) and reset. All component styles are scoped (`<style scoped>`).
 - `router.ts` — Vue Router configuration using HTML5 history mode (`createWebHistory`).
 - `main.ts` — application entry point; creates root `app.vue`, installs router, imports global styles, mounts to `#app`.
 - `env.d.ts` — Vite client types and `__APP_VERSION__` global definition.
@@ -30,7 +30,7 @@ Meme IQ (Vite + Vue 3, TypeScript, Composition API with `<script setup>`, ESLint
 ## Tooling
 
 - **TypeScript projects**: `tsconfig.json` references `tsconfig.app.json` (browser, `src/`, extends `@vue/tsconfig/tsconfig.dom.json`) and `tsconfig.node.json` (`vite.config.ts`, extends `@tsconfig/node24`). An option not covered in bases must be set in both.
-- **Fonts**: Served by Google Fonts CDN ('Azeret Mono', 'Instrument Sans') via `<link>` in `index.html`. No font packages in `package.json` and no font files in the repo.
+- **Fonts**: Served by Google Fonts CDN ('Anton', 'Azeret Mono', 'Instrument Sans') via `<link>` in `index.html`. No font packages in `package.json` and no font files in the repo.
 - **Images**: Import assets from `src/assets/` so Vite fingerprints them; nothing goes in `public/`.
 
 ## Deployment

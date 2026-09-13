@@ -17,13 +17,18 @@ function startMatch(): void {
 <template>
   <main class="main-screen">
     <div class="content">
-      <img
-        :src="faviconUrl"
-        alt="Meme IQ logo"
-        class="logo"
-        width="128"
-        height="128"
-      >
+      <div class="header">
+        <h1 class="title">
+          Meme IQ
+        </h1>
+        <img
+          :src="faviconUrl"
+          alt="Meme IQ logo"
+          class="logo"
+          width="128"
+          height="128"
+        >
+      </div>
       <button
         type="button"
         class="start-button"
@@ -51,12 +56,29 @@ function startMatch(): void {
   gap: 2.5rem;
 }
 
+.header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
 .logo {
   display: block;
   width: 128px;
   height: 128px;
   max-width: 100%;
   user-select: none;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: 2.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-main);
+  text-align: center;
+  line-height: 1.1;
 }
 
 .start-button {
@@ -66,8 +88,8 @@ function startMatch(): void {
   min-width: 160px;
   min-height: 48px;
   padding: 0.75rem 2.5rem;
-  background: transparent;
-  color: var(--text-main);
+  background: var(--accent);
+  color: var(--ground);
   border: 1px solid var(--accent);
   border-radius: 4px;
   font-family: var(--font-mono);
@@ -75,15 +97,15 @@ function startMatch(): void {
   font-weight: 600;
   letter-spacing: 0.12em;
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+  transition: filter 0.15s ease, transform 0.1s ease;
 }
 
 .start-button:hover {
-  background: var(--accent);
-  color: var(--ground);
+  filter: brightness(1.12);
 }
 
 .start-button:active {
+  filter: brightness(0.95);
   transform: scale(0.98);
 }
 </style>

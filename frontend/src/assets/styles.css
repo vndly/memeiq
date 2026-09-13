@@ -9,6 +9,7 @@
 
   --font-ui: 'Instrument Sans', system-ui, sans-serif;
   --font-mono: 'Azeret Mono', ui-monospace, monospace;
+  --font-display: 'Anton', Impact, sans-serif;
 
   --bg: var(--ground);
   --fg: var(--text-main);
