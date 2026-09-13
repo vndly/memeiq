@@ -61,7 +61,7 @@ function retryFetch(): void {
 .spinner {
   width: 44px;
   height: 44px;
-  border: 3px solid rgb(200 164 104 / 20%);
+  border: 3px solid rgb(255 255 255 / 20%);
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
@@ -101,23 +101,26 @@ function retryFetch(): void {
   min-height: 44px;
   padding: 0.6rem 2rem;
   background: var(--accent);
-  color: var(--ground);
-  border: 1px solid var(--accent);
-  border-radius: 4px;
+  color: var(--accent-contrast);
+  border: 2px solid #ffffff;
+  border-radius: 6px;
   font-family: var(--font-mono);
   font-size: 0.95rem;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.1em;
   cursor: pointer;
-  transition: filter 0.15s ease, transform 0.1s ease;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 25%);
+  transition: filter 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
 }
 
 .retry-button:hover {
-  filter: brightness(1.12);
+  filter: brightness(1.08);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
 }
 
 .retry-button:active {
   filter: brightness(0.95);
   transform: scale(0.98);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 20%);
 }
 </style>

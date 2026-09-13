@@ -1,11 +1,12 @@
 /* Global tokens and reset. */
 
 :root {
-  --ground: #0e1210;
-  --panel: #161a18;
-  --text-main: #f3ece0;
-  --text-dim: rgb(243 236 224 / 62%);
-  --accent: #c8a468;
+  --ground: #0280fb;
+  --panel: #0b1a30;
+  --text-main: #ffffff;
+  --text-dim: rgb(255 255 255 / 75%);
+  --accent: #ffd000;
+  --accent-contrast: #0a0f1d;
 
   --font-ui: 'Instrument Sans', system-ui, sans-serif;
   --font-mono: 'Azeret Mono', ui-monospace, monospace;

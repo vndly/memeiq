@@ -190,6 +190,7 @@ watch(
   min-height: 100%;
   width: 100%;
   padding: 1.5rem;
+  background: var(--ground) url('@/assets/background.jpg') center / cover no-repeat;
 }
 
 .visually-hidden {
@@ -231,16 +232,19 @@ watch(
   cursor: pointer;
   overflow: hidden;
   line-height: 0;
-  transition: filter 0.15s ease, transform 0.1s ease;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 25%);
+  transition: filter 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
 }
 
 .card:hover {
   filter: brightness(1.08);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 35%);
 }
 
 .card:active {
   filter: brightness(0.96);
   transform: scale(0.99);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 20%);
 }
 
 .thumbnail-image {
@@ -259,34 +263,38 @@ watch(
   min-height: 48px;
   padding: 0.75rem 1.5rem;
   background: var(--accent);
-  color: var(--ground);
-  border: 1px solid var(--accent);
-  border-radius: 4px;
+  color: var(--accent-contrast);
+  border: 2px solid #ffffff;
+  border-radius: 6px;
   font-family: var(--font-mono);
   font-size: 1rem;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.12em;
   cursor: pointer;
-  transition: filter 0.15s ease, transform 0.1s ease, opacity 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 25%);
+  transition: filter 0.15s ease, transform 0.1s ease, opacity 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .action-button:hover:not(:disabled) {
-  filter: brightness(1.12);
+  filter: brightness(1.08);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
 }
 
 .action-button:active:not(:disabled) {
   filter: brightness(0.95);
   transform: scale(0.98);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 20%);
 }
 
 .action-button:disabled {
-  opacity: 0.45;
+  opacity: 0.55;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 .action-button.is-playing {
-  background: #d9383a;
-  border-color: #d9383a;
+  background: #ff3b30;
+  border-color: #ffffff;
   color: #ffffff;
 }
 
