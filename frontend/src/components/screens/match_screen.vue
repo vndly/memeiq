@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import {onMounted, onUnmounted, ref, watch} from 'vue'
+import {computed, onMounted, onUnmounted, ref, watch} from 'vue'
+import {THUMBNAIL_RATIO} from '@/constants'
 import {memeCatalogue, pickRandomMemes} from '@/services/meme_catalogue'
 import {extractYouTubeVideoId, getYouTubeThumbnailUrl} from '@/services/youtube'
 import {YouTubeAudioPlayer} from '@/services/youtube_player'
@@ -12,6 +13,23 @@ const isPlayerReady = ref(false)
 const playerHostElement = ref<HTMLElement | null>(null)
 
 let audioPlayer: YouTubeAudioPlayer | null = null
+
+const actionButtonText = computed(() => {
+  if (isPlaying.value) {
+    return 'STOP'
+  }
+  if (!isPlayerReady.value || activeMeme.value === null) {
+    return 'LOADING...'
+  }
+  return 'PLAY'
+})
+
+const isActionButtonDisabled = computed(() => {
+  if (isPlaying.value) {
+    return false
+  }
+  return !isPlayerReady.value || activeMeme.value === null
+})
 
 /**
  * Loads a new random selection of memes and picks one target meme.
@@ -70,10 +88,16 @@ function setupAudioPlayer(): void {
 }
 
 /**
- * Handles play button click to start meme audio playback.
+ * Toggles meme audio playback (plays when ready/stopped, stops when playing).
  */
-function handlePlay(): void {
-  if (isPlaying.value || !isPlayerReady.value || activeMeme.value === null || audioPlayer === null) {
+function handleTogglePlayback(): void {
+  if (isPlaying.value) {
+    audioPlayer?.stop()
+    isPlaying.value = false
+    return
+  }
+
+  if (!isPlayerReady.value || activeMeme.value === null || audioPlayer === null) {
     return
   }
 
@@ -147,10 +171,11 @@ watch(
       <button
         type="button"
         class="action-button"
-        :disabled="!isPlayerReady || isPlaying || activeMeme === null"
-        @click="handlePlay"
+        :class="{'is-playing': isPlaying}"
+        :disabled="isActionButtonDisabled"
+        @click="handleTogglePlayback"
       >
-        PLAY
+        {{ actionButtonText }}
       </button>
     </div>
   </main>
@@ -222,7 +247,7 @@ watch(
   display: block;
   width: 100%;
   height: auto;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: v-bind(THUMBNAIL_RATIO);
   object-fit: cover;
 }
 
@@ -230,9 +255,9 @@ watch(
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 160px;
+  min-width: 180px;
   min-height: 48px;
-  padding: 0.75rem 2.5rem;
+  padding: 0.75rem 1.5rem;
   background: var(--accent);
   color: var(--ground);
   border: 1px solid var(--accent);
@@ -242,7 +267,7 @@ watch(
   font-weight: 600;
   letter-spacing: 0.12em;
   cursor: pointer;
-  transition: filter 0.15s ease, transform 0.1s ease, opacity 0.15s ease;
+  transition: filter 0.15s ease, transform 0.1s ease, opacity 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .action-button:hover:not(:disabled) {
@@ -257,6 +282,12 @@ watch(
 .action-button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.action-button.is-playing {
+  background: #d9383a;
+  border-color: #d9383a;
+  color: #ffffff;
 }
 
 .audio-player-host {
