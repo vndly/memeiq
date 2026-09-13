@@ -4,8 +4,11 @@ Meme IQ (Vite + Vue 3, TypeScript, Composition API with `<script setup>`, ESLint
 
 `src/` layout:
 
-- `components/screens/` — the routed screens (`main_screen.vue`, `match_screen.vue`).
+- `components/screens/` — the screen views (`main_screen.vue`, `match_screen.vue`, `loading_screen.vue`).
 - `components/` — shared presentational and UI components.
+- `constants.ts` — global application constants.
+- `services/` — application state and data fetching services.
+- `types/` — domain models and TypeScript interfaces.
 - `firebase.ts` — Firebase initialization (App, Firestore via `getFirestore`, Auth via `getAuth`).
 - `assets/styles.css` — global design tokens (`--ground`, `--panel`, `--text-main`, `--text-dim`, `--accent`, `--font-ui`, `--font-mono`, `--font-display`) and reset. All component styles are scoped (`<style scoped>`).
 - `router.ts` — Vue Router configuration using HTML5 history mode (`createWebHistory`).
