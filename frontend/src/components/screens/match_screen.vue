@@ -25,6 +25,14 @@ function getThumbnailUrl(videoUrl: string): string {
 }
 
 /**
+ * Meme card click handler (placeholder for future match interaction).
+ * @param _meme - Clicked meme card.
+ */
+function handleCardClick(_meme: Meme): void {
+  // Placeholder: does nothing for now.
+}
+
+/**
  * Action button click handler (placeholder for future match interaction).
  */
 function handleAction(): void {
@@ -53,16 +61,22 @@ watch(
 
     <div class="content">
       <div class="thumbnails-column">
-        <img
+        <button
           v-for="meme in selectedMemes"
           :key="meme.id"
-          :src="getThumbnailUrl(meme.url)"
-          :alt="meme.name"
-          class="thumbnail-image"
-          width="320"
-          height="180"
-          loading="eager"
+          type="button"
+          class="card"
+          @click="handleCardClick(meme)"
         >
+          <img
+            :src="getThumbnailUrl(meme.url)"
+            :alt="meme.name"
+            class="thumbnail-image"
+            width="320"
+            height="180"
+            loading="eager"
+          >
+        </button>
       </div>
 
       <button
@@ -115,15 +129,35 @@ watch(
   width: 100%;
 }
 
+.card {
+  display: block;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  border: 2px solid #ffffff;
+  border-radius: 12px;
+  background: var(--panel);
+  cursor: pointer;
+  overflow: hidden;
+  line-height: 0;
+  transition: filter 0.15s ease, transform 0.1s ease;
+}
+
+.card:hover {
+  filter: brightness(1.08);
+}
+
+.card:active {
+  filter: brightness(0.96);
+  transform: scale(0.99);
+}
+
 .thumbnail-image {
   display: block;
   width: 100%;
   height: auto;
   aspect-ratio: 16 / 9;
   object-fit: cover;
-  border: 2px solid #ffffff;
-  border-radius: 4px;
-  background: var(--panel);
 }
 
 .action-button {
