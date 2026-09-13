@@ -1,17 +1,26 @@
 <script setup lang="ts">
-import {onMounted, ref, watch} from 'vue'
+import {onMounted, onUnmounted, ref, watch} from 'vue'
 import {memeCatalogue, pickRandomMemes} from '@/services/meme_catalogue'
-import {getYouTubeThumbnailUrl} from '@/services/youtube'
+import {extractYouTubeVideoId, getYouTubeThumbnailUrl} from '@/services/youtube'
+import {YouTubeAudioPlayer} from '@/services/youtube_player'
 import type {Meme} from '@/types/meme'
 
 const selectedMemes = ref<Meme[]>([])
+const activeMeme = ref<Meme | null>(null)
+const isPlaying = ref(false)
+const isPlayerReady = ref(false)
+const playerHostElement = ref<HTMLElement | null>(null)
+
+let audioPlayer: YouTubeAudioPlayer | null = null
 
 /**
- * Loads a new random selection of memes into the match screen.
+ * Loads a new random selection of memes and picks one target meme.
  */
 function refreshSelection(): void {
   if (memeCatalogue.value.length > 0) {
     selectedMemes.value = pickRandomMemes(3)
+    const randomIndex = Math.floor(Math.random() * selectedMemes.value.length)
+    activeMeme.value = selectedMemes.value[randomIndex] ?? null
   }
 }
 
@@ -33,14 +42,54 @@ function handleCardClick(_meme: Meme): void {
 }
 
 /**
- * Action button click handler (placeholder for future match interaction).
+ * Initializes or remounts the YouTube audio player for the current active meme.
  */
-function handleAction(): void {
-  // Placeholder: does nothing for now.
+function setupAudioPlayer(): void {
+  isPlayerReady.value = false
+  if (audioPlayer === null) {
+    audioPlayer = new YouTubeAudioPlayer({
+      onEnded: (): void => {
+        isPlaying.value = false
+      },
+      onError: (): void => {
+        isPlayerReady.value = false
+        isPlaying.value = false
+      },
+      onReady: (): void => {
+        isPlayerReady.value = true
+      },
+    })
+  }
+
+  if (activeMeme.value !== null && playerHostElement.value !== null) {
+    const videoId = extractYouTubeVideoId(activeMeme.value.url)
+    if (videoId !== null) {
+      void audioPlayer.mount(playerHostElement.value, videoId)
+    }
+  }
+}
+
+/**
+ * Handles play button click to start meme audio playback.
+ */
+function handlePlay(): void {
+  if (isPlaying.value || !isPlayerReady.value || activeMeme.value === null || audioPlayer === null) {
+    return
+  }
+
+  isPlaying.value = true
+  audioPlayer.play()
 }
 
 onMounted(() => {
   refreshSelection()
+})
+
+onUnmounted(() => {
+  if (audioPlayer !== null) {
+    audioPlayer.destroy()
+    audioPlayer = null
+  }
 })
 
 watch(
@@ -51,6 +100,15 @@ watch(
     }
   },
 )
+
+watch(
+  () => activeMeme.value,
+  (newMeme) => {
+    if (newMeme !== null && playerHostElement.value !== null) {
+      setupAudioPlayer()
+    }
+  },
+)
 </script>
 
 <template>
@@ -58,6 +116,13 @@ watch(
     <h1 class="visually-hidden">
       Match
     </h1>
+
+    <div
+      ref="playerHostElement"
+      class="audio-player-host"
+      aria-hidden="true"
+      tabindex="-1"
+    />
 
     <div class="content">
       <div class="thumbnails-column">
@@ -82,9 +147,10 @@ watch(
       <button
         type="button"
         class="action-button"
-        @click="handleAction"
+        :disabled="!isPlayerReady || isPlaying || activeMeme === null"
+        @click="handlePlay"
       >
-        CONTINUE
+        PLAY
       </button>
     </div>
   </main>
@@ -176,15 +242,30 @@ watch(
   font-weight: 600;
   letter-spacing: 0.12em;
   cursor: pointer;
-  transition: filter 0.15s ease, transform 0.1s ease;
+  transition: filter 0.15s ease, transform 0.1s ease, opacity 0.15s ease;
 }
 
-.action-button:hover {
+.action-button:hover:not(:disabled) {
   filter: brightness(1.12);
 }
 
-.action-button:active {
+.action-button:active:not(:disabled) {
   filter: brightness(0.95);
   transform: scale(0.98);
+}
+
+.action-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.audio-player-host {
+  position: fixed;
+  top: -9999px;
+  left: -9999px;
+  width: 200px;
+  height: 200px;
+  opacity: 0;
+  pointer-events: none;
 }
 </style>
