@@ -236,7 +236,7 @@ watch(
     />
 
     <div class="content">
-      <div class="thumbnails-column">
+      <div class="thumbnails">
         <button
           v-for="meme in selectedMemes"
           :key="meme.id"
@@ -306,7 +306,7 @@ watch(
   max-width: 360px;
 }
 
-.thumbnails-column {
+.thumbnails {
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -417,5 +417,28 @@ watch(
   height: 200px;
   opacity: 0;
   pointer-events: none;
+}
+
+@media (min-width: 768px) {
+  .match-screen {
+    --card-gap: 1.5rem;
+    padding-inline: var(--card-gap);
+  }
+
+  .content {
+    max-width: 100%;
+    gap: 2.75rem;
+  }
+
+  .thumbnails {
+    flex-direction: row;
+    justify-content: center;
+    gap: var(--card-gap);
+    width: 100%;
+  }
+
+  .card {
+    flex: 1 1 0;
+  }
 }
 </style>
