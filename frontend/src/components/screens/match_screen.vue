@@ -14,6 +14,7 @@ const isPlaying = ref(false)
 const isPlayerReady = ref(false)
 const playerHostElement = ref<HTMLElement | null>(null)
 const clickedMemeId = ref<number | null>(null)
+const hasAudioPlayed = ref(false)
 
 const winAudio = typeof Audio !== 'undefined' ? new Audio(winAudioUrl) : null
 const failAudio = typeof Audio !== 'undefined' ? new Audio(failAudioUrl) : null
@@ -22,6 +23,10 @@ let audioPlayer: YouTubeAudioPlayer | null = null
 let resetTimeoutId: ReturnType<typeof setTimeout> | null = null
 
 const RESET_ROUND_DELAY_MS = 2000
+
+const isCardDisabled = computed(() => {
+  return clickedMemeId.value !== null || !hasAudioPlayed.value
+})
 
 const actionButtonText = computed(() => {
   if (isPlaying.value) {
@@ -95,6 +100,7 @@ function stopSoundEffects(): void {
  */
 function resetRound(): void {
   clickedMemeId.value = null
+  hasAudioPlayed.value = false
   if (resetTimeoutId !== null) {
     clearTimeout(resetTimeoutId)
     resetTimeoutId = null
@@ -112,7 +118,7 @@ function resetRound(): void {
  * @param meme - Clicked meme card.
  */
 function handleCardClick(meme: Meme): void {
-  if (clickedMemeId.value !== null || activeMeme.value === null) {
+  if (clickedMemeId.value !== null || activeMeme.value === null || !hasAudioPlayed.value) {
     return
   }
 
@@ -145,6 +151,9 @@ function setupAudioPlayer(): void {
         isPlayerReady.value = false
         isPlaying.value = false
       },
+      onPlaying: (): void => {
+        hasAudioPlayed.value = true
+      },
       onReady: (): void => {
         isPlayerReady.value = true
       },
@@ -173,6 +182,7 @@ function handleTogglePlayback(): void {
     return
   }
 
+  hasAudioPlayed.value = true
   isPlaying.value = true
   audioPlayer.play()
 }
@@ -236,7 +246,7 @@ watch(
             'is-correct': clickedMemeId === meme.id && meme.id === activeMeme?.id,
             'is-incorrect': clickedMemeId === meme.id && meme.id !== activeMeme?.id,
           }"
-          :disabled="clickedMemeId !== null"
+          :disabled="isCardDisabled"
           @click="handleCardClick(meme)"
         >
           <img

@@ -86,6 +86,7 @@ export interface YouTubeAudioPlayerCallbacks {
   onEnded: () => void
   onError: () => void
   onReady?: () => void
+  onPlaying?: () => void
 }
 
 /**
@@ -252,6 +253,10 @@ export class YouTubeAudioPlayer {
    * @param event - YouTube player state change event.
    */
   private handleStateChange(event: YouTubePlayerStateChangeEvent): void {
+    // 1 represents PLAYING in YouTube PlayerState
+    if (event.data === 1 && this.callbacks.onPlaying !== undefined) {
+      this.callbacks.onPlaying()
+    }
     // 0 represents ENDED in YouTube PlayerState
     if (event.data === 0) {
       this.callbacks.onEnded()
