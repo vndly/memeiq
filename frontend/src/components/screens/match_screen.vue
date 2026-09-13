@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import {computed, onMounted, onUnmounted, ref, watch} from 'vue'
+import failAudioUrl from '@/assets/fail.mp3'
+import winAudioUrl from '@/assets/win.mp3'
 import {THUMBNAIL_RATIO} from '@/constants'
 import {memeCatalogue, pickRandomMemes} from '@/services/meme_catalogue'
 import {extractYouTubeVideoId, getYouTubeThumbnailUrl} from '@/services/youtube'
@@ -12,6 +14,9 @@ const isPlaying = ref(false)
 const isPlayerReady = ref(false)
 const playerHostElement = ref<HTMLElement | null>(null)
 const clickedMemeId = ref<number | null>(null)
+
+const winAudio = typeof Audio !== 'undefined' ? new Audio(winAudioUrl) : null
+const failAudio = typeof Audio !== 'undefined' ? new Audio(failAudioUrl) : null
 
 let audioPlayer: YouTubeAudioPlayer | null = null
 let resetTimeoutId: ReturnType<typeof setTimeout> | null = null
@@ -59,6 +64,33 @@ function getThumbnailUrl(videoUrl: string): string {
 }
 
 /**
+ * Plays a sound effect from the beginning.
+ * @param audio - Target audio element.
+ */
+function playSoundEffect(audio: HTMLAudioElement | null): void {
+  if (audio !== null) {
+    audio.currentTime = 0
+    void audio.play().catch(() => {
+      // Audio playback aborted or blocked
+    })
+  }
+}
+
+/**
+ * Halts and rewinds active sound effects.
+ */
+function stopSoundEffects(): void {
+  if (winAudio !== null) {
+    winAudio.pause()
+    winAudio.currentTime = 0
+  }
+  if (failAudio !== null) {
+    failAudio.pause()
+    failAudio.currentTime = 0
+  }
+}
+
+/**
  * Resets match state by clearing selection, picking fresh memes, and reloading audio.
  */
 function resetRound(): void {
@@ -67,6 +99,7 @@ function resetRound(): void {
     clearTimeout(resetTimeoutId)
     resetTimeoutId = null
   }
+  stopSoundEffects()
   const previousActiveMeme = activeMeme.value
   refreshSelection()
   if (previousActiveMeme === activeMeme.value && activeMeme.value !== null) {
@@ -89,6 +122,9 @@ function handleCardClick(meme: Meme): void {
     audioPlayer?.stop()
     isPlaying.value = false
   }
+
+  const isCorrect = meme.id === activeMeme.value.id
+  playSoundEffect(isCorrect ? winAudio : failAudio)
 
   resetTimeoutId = setTimeout(() => {
     resetRound()
@@ -154,6 +190,7 @@ onUnmounted(() => {
     audioPlayer.destroy()
     audioPlayer = null
   }
+  stopSoundEffects()
 })
 
 watch(
