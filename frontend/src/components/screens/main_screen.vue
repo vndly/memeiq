@@ -44,7 +44,7 @@ function startMatch(): void {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3.5rem;
+  gap: 10.5rem;
   transform: translateY(-4vh);
 }
 
