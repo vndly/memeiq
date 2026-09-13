@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import {useRouter} from 'vue-router'
-import faviconUrl from '@/assets/favicon.png'
 
 const router = useRouter()
 
@@ -17,18 +16,9 @@ function startMatch(): void {
 <template>
   <main class="main-screen">
     <div class="content">
-      <div class="header">
-        <h1 class="title">
-          Meme IQ
-        </h1>
-        <img
-          :src="faviconUrl"
-          alt="Meme IQ logo"
-          class="logo"
-          width="128"
-          height="128"
-        >
-      </div>
+      <h1 class="title">
+        Meme IQ
+      </h1>
       <button
         type="button"
         class="start-button"
@@ -54,34 +44,21 @@ function startMatch(): void {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2.5rem;
-}
-
-.header {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1rem;
-}
-
-.logo {
-  display: block;
-  width: 128px;
-  height: 128px;
-  max-width: 100%;
-  user-select: none;
-  filter: drop-shadow(0 6px 16px rgb(0 0 0 / 30%));
+  gap: 3.5rem;
+  transform: translateY(-4vh);
 }
 
 .title {
   font-family: var(--font-display);
-  font-size: 2.75rem;
+  font-size: clamp(3.5rem, 9vw, 5.25rem);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-main);
   text-align: center;
-  line-height: 1.1;
-  text-shadow: 0 4px 16px rgb(0 0 0 / 40%), 0 1px 3px rgb(0 0 0 / 60%);
+  line-height: 1.05;
+  -webkit-text-stroke: 2.5px #000000;
+  paint-order: stroke fill;
+  text-shadow: 0 6px 18px rgb(0 0 0 / 50%);
 }
 
 .start-button {

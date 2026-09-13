@@ -209,7 +209,7 @@ watch(
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.5rem;
+  gap: 2.25rem;
   width: 100%;
   max-width: 360px;
 }
@@ -233,10 +233,11 @@ watch(
   overflow: hidden;
   line-height: 0;
   box-shadow: 0 8px 24px rgb(0 0 0 / 25%);
-  transition: filter 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+  transition: border-color 0.15s ease, filter 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
 }
 
 .card:hover {
+  border-color: var(--accent);
   filter: brightness(1.08);
   box-shadow: 0 10px 28px rgb(0 0 0 / 35%);
 }
@@ -261,6 +262,7 @@ watch(
   justify-content: center;
   min-width: 180px;
   min-height: 48px;
+  margin-top: 0.5rem;
   padding: 0.75rem 1.5rem;
   background: var(--accent);
   color: var(--accent-contrast);
@@ -287,9 +289,12 @@ watch(
 }
 
 .action-button:disabled {
-  opacity: 0.55;
+  background: #475569;
+  border-color: #64748b;
+  color: #cbd5e1;
   cursor: not-allowed;
   box-shadow: none;
+  filter: none;
 }
 
 .action-button.is-playing {
