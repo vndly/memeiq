@@ -4,7 +4,7 @@ Meme IQ (Vite + Vue 3, TypeScript, Composition API with `<script setup>`, ESLint
 
 `src/` layout:
 
-- `components/screens/` — the routed screens. Currently `blank_screen.vue`.
+- `components/screens/` — the routed screens (`main_screen.vue`, `match_screen.vue`).
 - `components/` — shared presentational and UI components.
 - `firebase.ts` — Firebase initialization (App, Firestore via `getFirestore`, Auth via `getAuth`).
 - `assets/styles.css` — global design tokens (`--ground`, `--panel`, `--text-main`, `--text-dim`, `--accent`, `--font-ui`, `--font-mono`) and reset. All component styles are scoped (`<style scoped>`).
