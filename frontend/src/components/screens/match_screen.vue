@@ -11,8 +11,12 @@ const activeMeme = ref<Meme | null>(null)
 const isPlaying = ref(false)
 const isPlayerReady = ref(false)
 const playerHostElement = ref<HTMLElement | null>(null)
+const clickedMemeId = ref<number | null>(null)
 
 let audioPlayer: YouTubeAudioPlayer | null = null
+let resetTimeoutId: ReturnType<typeof setTimeout> | null = null
+
+const RESET_ROUND_DELAY_MS = 2000
 
 const actionButtonText = computed(() => {
   if (isPlaying.value) {
@@ -25,6 +29,9 @@ const actionButtonText = computed(() => {
 })
 
 const isActionButtonDisabled = computed(() => {
+  if (clickedMemeId.value !== null) {
+    return true
+  }
   if (isPlaying.value) {
     return false
   }
@@ -52,11 +59,40 @@ function getThumbnailUrl(videoUrl: string): string {
 }
 
 /**
- * Meme card click handler (placeholder for future match interaction).
- * @param _meme - Clicked meme card.
+ * Resets match state by clearing selection, picking fresh memes, and reloading audio.
  */
-function handleCardClick(_meme: Meme): void {
-  // Placeholder: does nothing for now.
+function resetRound(): void {
+  clickedMemeId.value = null
+  if (resetTimeoutId !== null) {
+    clearTimeout(resetTimeoutId)
+    resetTimeoutId = null
+  }
+  const previousActiveMeme = activeMeme.value
+  refreshSelection()
+  if (previousActiveMeme === activeMeme.value && activeMeme.value !== null) {
+    setupAudioPlayer()
+  }
+}
+
+/**
+ * Handles meme card selection, visual match feedback, sound cutoff, and scheduled reset.
+ * @param meme - Clicked meme card.
+ */
+function handleCardClick(meme: Meme): void {
+  if (clickedMemeId.value !== null || activeMeme.value === null) {
+    return
+  }
+
+  clickedMemeId.value = meme.id
+
+  if (isPlaying.value) {
+    audioPlayer?.stop()
+    isPlaying.value = false
+  }
+
+  resetTimeoutId = setTimeout(() => {
+    resetRound()
+  }, RESET_ROUND_DELAY_MS)
 }
 
 /**
@@ -110,6 +146,10 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  if (resetTimeoutId !== null) {
+    clearTimeout(resetTimeoutId)
+    resetTimeoutId = null
+  }
   if (audioPlayer !== null) {
     audioPlayer.destroy()
     audioPlayer = null
@@ -155,6 +195,11 @@ watch(
           :key="meme.id"
           type="button"
           class="card"
+          :class="{
+            'is-correct': clickedMemeId === meme.id && meme.id === activeMeme?.id,
+            'is-incorrect': clickedMemeId === meme.id && meme.id !== activeMeme?.id,
+          }"
+          :disabled="clickedMemeId !== null"
           @click="handleCardClick(meme)"
         >
           <img
@@ -236,16 +281,30 @@ watch(
   transition: border-color 0.15s ease, filter 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
 }
 
-.card:hover {
+.card:hover:not(:disabled) {
   border-color: var(--accent);
   filter: brightness(1.08);
   box-shadow: 0 10px 28px rgb(0 0 0 / 35%);
 }
 
-.card:active {
+.card:active:not(:disabled) {
   filter: brightness(0.96);
   transform: scale(0.99);
   box-shadow: 0 4px 14px rgb(0 0 0 / 20%);
+}
+
+.card:disabled {
+  cursor: default;
+}
+
+.card.is-correct {
+  border-color: #34c759;
+  box-shadow: 0 0 16px rgb(52 199 89 / 40%), 0 8px 24px rgb(0 0 0 / 25%);
+}
+
+.card.is-incorrect {
+  border-color: #ff3b30;
+  box-shadow: 0 0 16px rgb(255 59 48 / 40%), 0 8px 24px rgb(0 0 0 / 25%);
 }
 
 .thumbnail-image {
