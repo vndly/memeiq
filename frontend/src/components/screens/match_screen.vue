@@ -22,7 +22,7 @@ const failAudio = typeof Audio !== 'undefined' ? new Audio(failAudioUrl) : null
 let audioPlayer: YouTubeAudioPlayer | null = null
 let resetTimeoutId: ReturnType<typeof setTimeout> | null = null
 
-const RESET_ROUND_DELAY_MS = 2000
+const RESET_ROUND_DELAY_MS = 1000
 
 const isCardDisabled = computed(() => {
   return clickedMemeId.value !== null || !hasAudioPlayed.value
@@ -319,7 +319,7 @@ watch(
   width: 100%;
   padding: 0;
   margin: 0;
-  border: 2px solid #ffffff;
+  border: 4px solid #ffffff;
   border-radius: 12px;
   background: var(--panel);
   cursor: pointer;
