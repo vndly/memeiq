@@ -1,5 +1,5 @@
 import {ref} from 'vue'
-import {MEME_CATALOGUE_URL} from '@/constants'
+import {CATALOGUE_LOAD_DELAY_MS, MEME_CATALOGUE_URL} from '@/constants'
 import type {Meme} from '@/types/meme'
 
 /**
@@ -25,6 +25,10 @@ export async function fetchMemeCatalogue(): Promise<Meme[]> {
   isCatalogueLoading.value = true
   catalogueError.value = null
 
+  const delayPromise = new Promise<void>((resolve) => {
+    setTimeout(resolve, CATALOGUE_LOAD_DELAY_MS)
+  })
+
   try {
     const response = await fetch(MEME_CATALOGUE_URL, {
       redirect: 'follow',
@@ -40,10 +44,12 @@ export async function fetchMemeCatalogue(): Promise<Meme[]> {
       throw new Error('Unexpected response format: expected an array of memes')
     }
 
+    await delayPromise
     memeCatalogue.value = data as Meme[]
     isCatalogueLoading.value = false
     return memeCatalogue.value
   } catch (error) {
+    await delayPromise
     const message = error instanceof Error ? error.message : 'Failed to load meme catalogue'
     catalogueError.value = message
     isCatalogueLoading.value = false

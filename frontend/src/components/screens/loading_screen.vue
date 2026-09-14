@@ -49,22 +49,24 @@ function retryFetch(): void {
   min-height: 100%;
   width: 100%;
   padding: 1.5rem;
+  background: var(--ground) url('@/assets/background.jpg') center / cover no-repeat;
 }
 
 .content {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.5rem;
+  gap: 2rem;
 }
 
 .spinner {
-  width: 44px;
-  height: 44px;
-  border: 3px solid rgb(255 255 255 / 20%);
+  width: 64px;
+  height: 64px;
+  border: 6px solid #000000;
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
+  filter: drop-shadow(0 0 1px #000000) drop-shadow(0 4px 12px rgb(0 0 0 / 35%));
 }
 
 @keyframes spin {
@@ -74,11 +76,16 @@ function retryFetch(): void {
 }
 
 .loading-text {
-  font-family: var(--font-mono);
-  font-size: 1rem;
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  color: var(--text-dim);
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 7vw, 3.5rem);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-main);
+  text-align: center;
+  line-height: 1.05;
+  -webkit-text-stroke: 2.5px #000000;
+  paint-order: stroke fill;
+  text-shadow: 0 6px 18px rgb(0 0 0 / 50%);
 }
 
 .error-content {
@@ -91,6 +98,7 @@ function retryFetch(): void {
   font-size: 0.95rem;
   line-height: 1.4;
   color: var(--text-main);
+  text-shadow: 0 2px 8px rgb(0 0 0 / 50%);
 }
 
 .retry-button {
