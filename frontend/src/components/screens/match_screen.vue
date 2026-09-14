@@ -32,7 +32,7 @@ const actionButtonText = computed(() => {
   if (isPlaying.value) {
     return 'STOP'
   }
-  if (!isPlayerReady.value || activeMeme.value === null) {
+  if (clickedMemeId.value !== null || !isPlayerReady.value || activeMeme.value === null) {
     return 'LOADING...'
   }
   return 'PLAY'
@@ -100,6 +100,7 @@ function stopSoundEffects(): void {
  */
 function resetRound(): void {
   clickedMemeId.value = null
+  isPlayerReady.value = false
   hasAudioPlayed.value = false
   if (resetTimeoutId !== null) {
     clearTimeout(resetTimeoutId)
