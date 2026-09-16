@@ -331,6 +331,37 @@ watch(
             height="180"
             loading="eager"
           >
+          <div
+            v-if="clickedMemeId === meme.id"
+            class="feedback-overlay"
+            aria-hidden="true"
+          >
+            <svg
+              v-if="meme.id === activeMeme?.id"
+              class="feedback-icon is-correct"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="3.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+            <svg
+              v-else
+              class="feedback-icon is-incorrect"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="3.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </div>
         </button>
       </div>
 
@@ -394,6 +425,7 @@ watch(
 }
 
 .card {
+  position: relative;
   display: block;
   width: 100%;
   padding: 0;
@@ -432,6 +464,32 @@ watch(
 .card.is-incorrect {
   border-color: #ff3b30;
   box-shadow: 0 0 16px rgb(255 59 48 / 40%), 0 8px 24px rgb(0 0 0 / 25%);
+}
+
+.feedback-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(0 0 0 / 35%);
+  pointer-events: none;
+}
+
+.feedback-icon {
+  width: 104px;
+  height: 104px;
+  max-width: 75%;
+  max-height: 75%;
+  filter: drop-shadow(0 2px 8px rgb(0 0 0 / 60%));
+}
+
+.feedback-icon.is-correct {
+  color: #34c759;
+}
+
+.feedback-icon.is-incorrect {
+  color: #ff3b30;
 }
 
 .thumbnail-image {
