@@ -1,12 +1,20 @@
 <script setup lang="ts">
 import {computed, onMounted, onUnmounted, ref, watch} from 'vue'
+import {onBeforeRouteLeave, useRouter} from 'vue-router'
+import type {RouteLocationRaw} from 'vue-router'
 import failAudioUrl from '@/assets/fail.mp3'
 import winAudioUrl from '@/assets/win.mp3'
+import ConfirmDialog from '@/components/confirm_dialog.vue'
 import {THUMBNAIL_RATIO} from '@/constants'
 import {memeCatalogue, pickRandomMemes} from '@/services/meme_catalogue'
 import {extractYouTubeVideoId, getYouTubeThumbnailUrl} from '@/services/youtube'
 import {YouTubeAudioPlayer} from '@/services/youtube_player'
 import type {Meme} from '@/types/meme'
+
+const router = useRouter()
+const isConfirmOpen = ref(false)
+const isNavigationConfirmed = ref(false)
+const targetRoute = ref<RouteLocationRaw | null>(null)
 
 const selectedMemes = ref<Meme[]>([])
 const activeMeme = ref<Meme | null>(null)
@@ -188,6 +196,52 @@ function handleTogglePlayback(): void {
   audioPlayer.play()
 }
 
+/**
+ * Stops active audio playback, sound effects, and pending round transitions.
+ */
+function haltPlayback(): void {
+  if (isPlaying.value) {
+    audioPlayer?.stop()
+    isPlaying.value = false
+  }
+  stopSoundEffects()
+  if (resetTimeoutId !== null) {
+    clearTimeout(resetTimeoutId)
+    resetTimeoutId = null
+  }
+}
+
+/**
+ * Confirms navigation away from the match screen.
+ */
+function handleConfirmLeave(): void {
+  isNavigationConfirmed.value = true
+  isConfirmOpen.value = false
+  const destination = targetRoute.value ?? {
+    name: 'home',
+  }
+  void router.push(destination)
+}
+
+/**
+ * Cancels navigation away from the match screen.
+ */
+function handleCancelLeave(): void {
+  isConfirmOpen.value = false
+  targetRoute.value = null
+}
+
+onBeforeRouteLeave((to) => {
+  if (isNavigationConfirmed.value) {
+    return true
+  }
+
+  haltPlayback()
+  targetRoute.value = to
+  isConfirmOpen.value = true
+  return false
+})
+
 onMounted(() => {
   refreshSelection()
 })
@@ -271,6 +325,12 @@ watch(
         {{ actionButtonText }}
       </button>
     </div>
+
+    <ConfirmDialog
+      :is-open="isConfirmOpen"
+      @confirm="handleConfirmLeave"
+      @cancel="handleCancelLeave"
+    />
   </main>
 </template>
 
