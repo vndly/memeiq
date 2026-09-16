@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {useRouter} from 'vue-router'
+import {analytics} from '@/services/analytics'
 
 const router = useRouter()
 
@@ -7,6 +8,7 @@ const router = useRouter()
  * Navigates to the match screen.
  */
 function startMatch(): void {
+  analytics.trackMatchStart()
   void router.push({
     name: 'match',
   })

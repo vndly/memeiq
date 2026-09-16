@@ -6,6 +6,7 @@ import failAudioUrl from '@/assets/fail.mp3'
 import winAudioUrl from '@/assets/win.mp3'
 import ConfirmDialog from '@/components/confirm_dialog.vue'
 import {THUMBNAIL_RATIO} from '@/constants'
+import {analytics} from '@/services/analytics'
 import {memeCatalogue, pickRandomMemes} from '@/services/meme_catalogue'
 import {extractYouTubeVideoId, getYouTubeThumbnailUrl} from '@/services/youtube'
 import {YouTubeAudioPlayer} from '@/services/youtube_player'
@@ -141,6 +142,16 @@ function handleCardClick(meme: Meme): void {
   const isCorrect = meme.id === activeMeme.value.id
   playSoundEffect(isCorrect ? winAudio : failAudio)
 
+  const selectedVideoId = extractYouTubeVideoId(meme.url) ?? undefined
+  const targetVideoId = extractYouTubeVideoId(activeMeme.value.url) ?? undefined
+  analytics.trackThumbnailSelect({
+    selectedVideoId: selectedVideoId,
+    selectedVideoName: meme.name,
+    targetVideoId: targetVideoId,
+    targetVideoName: activeMeme.value.name,
+    result: isCorrect ? 'success' : 'failure',
+  })
+
   resetTimeoutId = setTimeout(() => {
     resetRound()
   }, RESET_ROUND_DELAY_MS)
@@ -193,6 +204,11 @@ function handleTogglePlayback(): void {
 
   hasAudioPlayed.value = true
   isPlaying.value = true
+  const videoId = extractYouTubeVideoId(activeMeme.value.url) ?? undefined
+  analytics.trackAudioPlay({
+    videoId: videoId,
+    videoName: activeMeme.value.name,
+  })
   audioPlayer.play()
 }
 
@@ -215,6 +231,7 @@ function haltPlayback(): void {
  * Confirms navigation away from the match screen.
  */
 function handleConfirmLeave(): void {
+  analytics.trackMatchLeave()
   isNavigationConfirmed.value = true
   isConfirmOpen.value = false
   const destination = targetRoute.value ?? {
@@ -227,6 +244,7 @@ function handleConfirmLeave(): void {
  * Cancels navigation away from the match screen.
  */
 function handleCancelLeave(): void {
+  analytics.trackMatchStay()
   isConfirmOpen.value = false
   targetRoute.value = null
 }
@@ -239,6 +257,7 @@ onBeforeRouteLeave((to) => {
   haltPlayback()
   targetRoute.value = to
   isConfirmOpen.value = true
+  analytics.trackLeaveDialogShown()
   return false
 })
 
