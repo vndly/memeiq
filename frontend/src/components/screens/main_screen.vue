@@ -1,16 +1,50 @@
 <script setup lang="ts">
+import {ref} from 'vue'
 import {useRouter} from 'vue-router'
 import {analytics} from '@/services/analytics'
+import type {Difficulty} from '@/types/difficulty'
+
+interface DifficultyOption {
+  difficulty: Difficulty
+  label: string
+}
 
 const router = useRouter()
+const isSelectingDifficulty = ref(false)
+
+const DIFFICULTY_OPTIONS: readonly DifficultyOption[] = [
+  {
+    difficulty: 'easy',
+    label: 'EASY',
+  },
+  {
+    difficulty: 'medium',
+    label: 'MEDIUM',
+  },
+  {
+    difficulty: 'hard',
+    label: 'HARD',
+  },
+]
 
 /**
- * Navigates to the match screen.
+ * Reveals the difficulty options.
  */
-function startMatch(): void {
-  analytics.trackMatchStart()
+function handleStartClick(): void {
+  isSelectingDifficulty.value = true
+}
+
+/**
+ * Navigates to the match screen with the chosen difficulty.
+ * @param difficulty - The chosen match difficulty.
+ */
+function selectDifficulty(difficulty: Difficulty): void {
+  analytics.trackMatchStart(difficulty)
   void router.push({
     name: 'match',
+    query: {
+      difficulty: difficulty,
+    },
   })
 }
 </script>
@@ -21,13 +55,33 @@ function startMatch(): void {
       <h1 class="title">
         Meme IQ
       </h1>
-      <button
-        type="button"
-        class="start-button"
-        @click="startMatch"
+      <Transition
+        name="fade"
+        mode="out-in"
       >
-        START
-      </button>
+        <button
+          v-if="!isSelectingDifficulty"
+          type="button"
+          class="menu-button"
+          @click="handleStartClick"
+        >
+          START
+        </button>
+        <div
+          v-else
+          class="difficulty-options"
+        >
+          <button
+            v-for="option in DIFFICULTY_OPTIONS"
+            :key="option.difficulty"
+            type="button"
+            class="menu-button"
+            @click="selectDifficulty(option.difficulty)"
+          >
+            {{ option.label }}
+          </button>
+        </div>
+      </Transition>
     </div>
   </main>
 </template>
@@ -46,7 +100,7 @@ function startMatch(): void {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10.5rem;
+  gap: clamp(4rem, 12vh, 10.5rem);
   transform: translateY(-4vh);
 }
 
@@ -63,11 +117,19 @@ function startMatch(): void {
   text-shadow: 0 6px 18px rgb(0 0 0 / 50%);
 }
 
-.start-button {
+.difficulty-options {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+}
+
+.menu-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 160px;
+  min-width: 180px;
   min-height: 48px;
   padding: 0.75rem 2.5rem;
   background: var(--accent);
@@ -83,14 +145,26 @@ function startMatch(): void {
   transition: filter 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
 }
 
-.start-button:hover {
+.menu-button:hover {
   filter: brightness(1.08);
   box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
 }
 
-.start-button:active {
+.menu-button:active {
   filter: brightness(0.95);
   transform: scale(0.98);
   box-shadow: 0 4px 12px rgb(0 0 0 / 20%);
 }
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+  transform: scale(0.95);
+}
 </style>
+

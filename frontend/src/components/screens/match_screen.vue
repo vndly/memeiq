@@ -1,21 +1,36 @@
 <script setup lang="ts">
 import {computed, onMounted, onUnmounted, ref, watch} from 'vue'
-import {onBeforeRouteLeave, useRouter} from 'vue-router'
+import {onBeforeRouteLeave, useRoute, useRouter} from 'vue-router'
 import type {RouteLocationRaw} from 'vue-router'
 import failAudioUrl from '@/assets/fail.mp3'
 import winAudioUrl from '@/assets/win.mp3'
 import ConfirmDialog from '@/components/confirm_dialog.vue'
-import {THUMBNAIL_RATIO} from '@/constants'
+import {DEFAULT_DIFFICULTY, DIFFICULTY_CARD_COUNTS, THUMBNAIL_RATIO} from '@/constants'
 import {analytics} from '@/services/analytics'
 import {memeCatalogue, pickRandomMemes} from '@/services/meme_catalogue'
 import {extractYouTubeVideoId, getYouTubeThumbnailUrl} from '@/services/youtube'
 import {YouTubeAudioPlayer} from '@/services/youtube_player'
+import {isDifficulty} from '@/types/difficulty'
+import type {Difficulty} from '@/types/difficulty'
 import type {Meme} from '@/types/meme'
 
 const router = useRouter()
+const route = useRoute()
 const isConfirmOpen = ref(false)
 const isNavigationConfirmed = ref(false)
 const targetRoute = ref<RouteLocationRaw | null>(null)
+
+const difficulty = computed<Difficulty>(() => {
+  const queryDifficulty = route.query.difficulty
+  if (typeof queryDifficulty === 'string' && isDifficulty(queryDifficulty)) {
+    return queryDifficulty
+  }
+  return DEFAULT_DIFFICULTY
+})
+
+const cardCount = computed<number>(() => {
+  return DIFFICULTY_CARD_COUNTS[difficulty.value]
+})
 
 const selectedMemes = ref<Meme[]>([])
 const activeMeme = ref<Meme | null>(null)
@@ -62,7 +77,7 @@ const isActionButtonDisabled = computed(() => {
  */
 function refreshSelection(): void {
   if (memeCatalogue.value.length > 0) {
-    selectedMemes.value = pickRandomMemes(3)
+    selectedMemes.value = pickRandomMemes(cardCount.value)
     const randomIndex = Math.floor(Math.random() * selectedMemes.value.length)
     activeMeme.value = selectedMemes.value[randomIndex] ?? null
   }
@@ -278,6 +293,14 @@ onUnmounted(() => {
 })
 
 watch(
+  () => difficulty.value,
+  () => {
+    haltPlayback()
+    resetRound()
+  },
+)
+
+watch(
   () => memeCatalogue.value,
   () => {
     if (selectedMemes.value.length === 0) {
@@ -309,8 +332,14 @@ watch(
       tabindex="-1"
     />
 
-    <div class="content">
-      <div class="thumbnails">
+    <div
+      class="content"
+      :class="`content--${difficulty}`"
+    >
+      <div
+        class="thumbnails"
+        :class="`thumbnails--${difficulty}`"
+      >
         <button
           v-for="meme in selectedMemes"
           :key="meme.id"
@@ -417,11 +446,27 @@ watch(
   max-width: 360px;
 }
 
+.content--hard {
+  max-width: min(100%, 460px);
+}
+
 .thumbnails {
-  display: flex;
-  flex-direction: column;
+  display: grid;
   gap: 1rem;
   width: 100%;
+}
+
+.thumbnails--easy {
+  grid-template-columns: 1fr;
+}
+
+.thumbnails--medium {
+  grid-template-columns: 1fr;
+}
+
+.thumbnails--hard {
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
 }
 
 .card {
@@ -477,8 +522,8 @@ watch(
 }
 
 .feedback-icon {
-  width: 104px;
-  height: 104px;
+  width: clamp(48px, 12vw, 104px);
+  height: clamp(48px, 12vw, 104px);
   max-width: 75%;
   max-height: 75%;
   filter: drop-shadow(0 2px 8px rgb(0 0 0 / 60%));
@@ -564,19 +609,40 @@ watch(
   }
 
   .content {
-    max-width: 100%;
-    gap: 2.75rem;
+    gap: 2.5rem;
+  }
+
+  .content--easy {
+    max-width: 1100px;
+  }
+
+  .content--medium {
+    max-width: 720px;
+  }
+
+  .content--hard {
+    max-width: 1100px;
   }
 
   .thumbnails {
-    flex-direction: row;
-    justify-content: center;
     gap: var(--card-gap);
     width: 100%;
   }
 
+  .thumbnails--easy {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .thumbnails--medium {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .thumbnails--hard {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
   .card {
-    flex: 1 1 0;
+    width: 100%;
   }
 }
 </style>

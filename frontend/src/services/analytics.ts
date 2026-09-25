@@ -2,6 +2,7 @@ import {getAnalytics, isSupported, logEvent} from 'firebase/analytics'
 import type {Analytics} from 'firebase/analytics'
 import type {FirebaseApp} from 'firebase/app'
 import {app} from '@/firebase'
+import type {Difficulty} from '@/types/difficulty'
 
 /**
  * Parameters for tracking an audio playback event.
@@ -74,8 +75,15 @@ export class AnalyticsService {
 
   /**
    * Tracks when a player starts a new match.
+   * @param difficulty - Selected match difficulty.
    */
-  trackMatchStart(): void {
+  trackMatchStart(difficulty?: Difficulty): void {
+    if (difficulty !== undefined) {
+      this.log('match_start', {
+        difficulty: difficulty,
+      })
+      return
+    }
     this.log('match_start')
   }
 
