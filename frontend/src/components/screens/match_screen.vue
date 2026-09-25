@@ -419,9 +419,14 @@ watch(
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
   width: 100%;
-  padding: 1.5rem;
+  padding-top: max(0.75rem, env(safe-area-inset-top));
+  padding-right: max(1rem, env(safe-area-inset-right));
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  padding-left: max(1rem, env(safe-area-inset-left));
+  overflow: hidden;
   background: var(--ground) url('@/assets/background.jpg') center / cover no-repeat;
 }
 
@@ -441,42 +446,53 @@ watch(
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2.25rem;
+  justify-content: space-between;
+  height: 100%;
+  max-height: 100%;
   width: 100%;
-  max-width: 360px;
-}
-
-.content--hard {
-  max-width: min(100%, 460px);
+  max-width: 480px;
+  gap: 0.75rem;
 }
 
 .thumbnails {
   display: grid;
-  gap: 1rem;
+  flex: 1 1 0;
+  min-height: 0;
   width: 100%;
+  align-items: center;
+  justify-items: center;
 }
 
 .thumbnails--easy {
   grid-template-columns: 1fr;
+  grid-template-rows: repeat(3, 1fr);
+  gap: 0.5rem;
 }
 
 .thumbnails--medium {
   grid-template-columns: 1fr;
+  grid-template-rows: repeat(4, 1fr);
+  gap: 0.4rem;
 }
 
 .thumbnails--hard {
   grid-template-columns: repeat(2, 1fr);
-  gap: 0.75rem;
+  grid-template-rows: repeat(3, 1fr);
+  gap: 0.4rem;
 }
 
 .card {
   position: relative;
   display: block;
-  width: 100%;
+  height: auto;
+  width: auto;
+  max-height: 100%;
+  max-width: 100%;
+  aspect-ratio: v-bind(THUMBNAIL_RATIO);
   padding: 0;
   margin: 0;
-  border: 4px solid #ffffff;
-  border-radius: 12px;
+  border: 3px solid #ffffff;
+  border-radius: 8px;
   background: var(--panel);
   cursor: pointer;
   overflow: hidden;
@@ -540,19 +556,18 @@ watch(
 .thumbnail-image {
   display: block;
   width: 100%;
-  height: auto;
-  aspect-ratio: v-bind(THUMBNAIL_RATIO);
+  height: 100%;
   object-fit: cover;
 }
 
 .action-button {
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-width: 180px;
-  min-height: 48px;
-  margin-top: 0.5rem;
-  padding: 0.75rem 1.5rem;
+  min-height: 44px;
+  padding: 0.65rem 1.5rem;
   background: var(--accent);
   color: var(--accent-contrast);
   border: 2px solid #ffffff;
@@ -605,44 +620,62 @@ watch(
 @media (min-width: 768px) {
   .match-screen {
     --card-gap: 1.5rem;
-    padding-inline: var(--card-gap);
+    height: auto;
+    min-height: 100%;
+    max-height: none;
+    overflow: visible;
+    padding: 1.5rem var(--card-gap);
   }
 
   .content {
-    gap: 2.5rem;
-  }
-
-  .content--easy {
-    max-width: 1100px;
-  }
-
-  .content--medium {
-    max-width: 720px;
-  }
-
-  .content--hard {
-    max-width: 1100px;
+    height: auto;
+    max-height: none;
+    max-width: 100%;
+    justify-content: center;
+    gap: 2.75rem;
   }
 
   .thumbnails {
-    gap: var(--card-gap);
+    flex: none;
+    height: auto;
     width: 100%;
+    gap: var(--card-gap);
   }
 
   .thumbnails--easy {
     grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: none;
   }
 
   .thumbnails--medium {
     grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: none;
+    max-width: calc((100% - 2 * var(--card-gap)) * 2 / 3 + var(--card-gap));
   }
 
   .thumbnails--hard {
     grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: none;
   }
 
   .card {
+    height: auto;
     width: 100%;
+    max-height: none;
+    aspect-ratio: auto;
+    border-width: 4px;
+    border-radius: 12px;
+  }
+
+  .thumbnail-image {
+    aspect-ratio: v-bind(THUMBNAIL_RATIO);
+    height: auto;
+  }
+
+  .action-button {
+    min-height: 48px;
+    padding: 0.75rem 1.5rem;
   }
 }
+
 </style>
