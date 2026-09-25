@@ -415,6 +415,12 @@ watch(
 
 <style scoped>
 .match-screen {
+  --safe-top: max(0.75rem, env(safe-area-inset-top, 0px));
+  --safe-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+  --safe-right: max(1rem, env(safe-area-inset-right, 0px));
+  --safe-left: max(1rem, env(safe-area-inset-left, 0px));
+  --ui-overhead: calc(var(--safe-top) + var(--safe-bottom) + 44px + 0.75rem);
+
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -422,10 +428,10 @@ watch(
   height: 100dvh;
   max-height: 100dvh;
   width: 100%;
-  padding-top: max(0.75rem, env(safe-area-inset-top));
-  padding-right: max(1rem, env(safe-area-inset-right));
-  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
-  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-top: var(--safe-top);
+  padding-right: var(--safe-right);
+  padding-bottom: var(--safe-bottom);
+  padding-left: var(--safe-left);
   overflow: hidden;
   background: var(--ground) url('@/assets/background.jpg') center / cover no-repeat;
 }
@@ -455,30 +461,40 @@ watch(
 }
 
 .thumbnails {
+  --mobile-card-gap: 0.5rem;
   display: grid;
   flex: 1 1 0;
   min-height: 0;
   width: 100%;
+  gap: var(--mobile-card-gap);
+  align-content: center;
+  justify-content: center;
   align-items: center;
   justify-items: center;
 }
 
 .thumbnails--easy {
   grid-template-columns: 1fr;
-  grid-template-rows: repeat(3, 1fr);
-  gap: 0.5rem;
+}
+
+.thumbnails--easy .card {
+  max-height: calc((100dvh - var(--ui-overhead) - 2 * var(--mobile-card-gap)) / 3);
 }
 
 .thumbnails--medium {
   grid-template-columns: 1fr;
-  grid-template-rows: repeat(4, 1fr);
-  gap: 0.4rem;
+}
+
+.thumbnails--medium .card {
+  max-height: calc((100dvh - var(--ui-overhead) - 3 * var(--mobile-card-gap)) / 4);
 }
 
 .thumbnails--hard {
   grid-template-columns: repeat(2, 1fr);
-  grid-template-rows: repeat(3, 1fr);
-  gap: 0.4rem;
+}
+
+.thumbnails--hard .card {
+  max-height: calc((100dvh - var(--ui-overhead) - 2 * var(--mobile-card-gap)) / 3);
 }
 
 .card {
@@ -658,7 +674,10 @@ watch(
     grid-template-rows: none;
   }
 
-  .card {
+  .card,
+  .thumbnails--easy .card,
+  .thumbnails--medium .card,
+  .thumbnails--hard .card {
     height: auto;
     width: 100%;
     max-height: none;
