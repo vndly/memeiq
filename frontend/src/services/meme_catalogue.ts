@@ -52,25 +52,37 @@ export async function fetchMemeCatalogue(): Promise<Meme[]> {
 }
 
 /**
- * Picks random distinct memes from the catalogue.
- * @param count - The number of memes to pick.
- * @returns An array of randomly selected memes.
+ * Returns a shuffled copy of the given memes.
+ * @param memes - The memes to shuffle.
+ * @returns A new array with the memes in random order.
  */
-export function pickRandomMemes(count: number): Meme[] {
-  const memesPool = [...memeCatalogue.value]
-  if (memesPool.length <= count) {
-    return memesPool
-  }
+export function shuffleMemes(memes: readonly Meme[]): Meme[] {
+  const shuffledMemes = [...memes]
 
-  for (let i = memesPool.length - 1; i > 0; i--) {
+  for (let i = shuffledMemes.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1))
-    const itemAtI = memesPool[i]
-    const itemAtJ = memesPool[j]
+    const itemAtI = shuffledMemes[i]
+    const itemAtJ = shuffledMemes[j]
     if (itemAtI !== undefined && itemAtJ !== undefined) {
-      memesPool[i] = itemAtJ
-      memesPool[j] = itemAtI
+      shuffledMemes[i] = itemAtJ
+      shuffledMemes[j] = itemAtI
     }
   }
 
-  return memesPool.slice(0, count)
+  return shuffledMemes
+}
+
+/**
+ * Picks the memes shown in a stage: the target meme plus random distinct decoys from the catalogue.
+ * @param targetMeme - The meme whose audio plays in the stage.
+ * @param count - The total number of memes to pick.
+ * @returns The target meme and its decoys in random order.
+ */
+export function pickStageMemes(targetMeme: Meme, count: number): Meme[] {
+  const decoyPool = memeCatalogue.value.filter((meme) => meme.id !== targetMeme.id)
+  const decoys = shuffleMemes(decoyPool).slice(0, count - 1)
+  return shuffleMemes([
+    targetMeme,
+    ...decoys,
+  ])
 }

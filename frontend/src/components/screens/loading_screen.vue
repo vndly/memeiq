@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import LoadingSpinner from '@/components/loading_spinner.vue'
 import {catalogueError, fetchMemeCatalogue, isCatalogueLoading} from '@/services/meme_catalogue'
 
 /**
@@ -15,11 +16,7 @@ function retryFetch(): void {
       v-if="isCatalogueLoading"
       class="content"
     >
-      <div
-        class="spinner"
-        role="status"
-        aria-label="Loading meme catalogue"
-      />
+      <LoadingSpinner label="Loading meme catalogue" />
       <p class="loading-text">
         Loading...
       </p>
@@ -57,22 +54,6 @@ function retryFetch(): void {
   flex-direction: column;
   align-items: center;
   gap: 2rem;
-}
-
-.spinner {
-  width: 64px;
-  height: 64px;
-  border: 6px solid #000000;
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  filter: drop-shadow(0 0 1px #000000) drop-shadow(0 4px 12px rgb(0 0 0 / 35%));
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .loading-text {

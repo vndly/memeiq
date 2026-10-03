@@ -5,9 +5,11 @@ import type {RouteLocationRaw} from 'vue-router'
 import failAudioUrl from '@/assets/fail.mp3'
 import winAudioUrl from '@/assets/win.mp3'
 import ConfirmDialog from '@/components/confirm_dialog.vue'
+import LoadingSpinner from '@/components/loading_spinner.vue'
 import {DEFAULT_DIFFICULTY, DIFFICULTY_CARD_COUNTS, THUMBNAIL_RATIO} from '@/constants'
 import {analytics} from '@/services/analytics'
-import {memeCatalogue, pickRandomMemes} from '@/services/meme_catalogue'
+import {preloadImage} from '@/services/image_preloader'
+import {memeCatalogue, pickStageMemes, shuffleMemes} from '@/services/meme_catalogue'
 import {extractYouTubeVideoId, getYouTubeThumbnailUrl} from '@/services/youtube'
 import {YouTubeAudioPlayer} from '@/services/youtube_player'
 import {isDifficulty} from '@/types/difficulty'
@@ -32,10 +34,16 @@ const cardCount = computed<number>(() => {
   return DIFFICULTY_CARD_COUNTS[difficulty.value]
 })
 
+const stageTargetMemes = ref<Meme[]>([])
+const stageIndex = ref(0)
+const correctAnswerCount = ref(0)
+const isStageLoading = ref(true)
+const isMatchComplete = ref(false)
 const selectedMemes = ref<Meme[]>([])
 const activeMeme = ref<Meme | null>(null)
 const isPlaying = ref(false)
 const isPlayerReady = ref(false)
+const isAudioUnavailable = ref(false)
 const playerHostElement = ref<HTMLElement | null>(null)
 const clickedMemeId = ref<number | null>(null)
 const hasAudioPlayed = ref(false)
@@ -45,11 +53,21 @@ const failAudio = typeof Audio !== 'undefined' ? new Audio(failAudioUrl) : null
 
 let audioPlayer: YouTubeAudioPlayer | null = null
 let resetTimeoutId: ReturnType<typeof setTimeout> | null = null
+let resolveAudioLoad: (() => void) | null = null
+let stageLoadGeneration = 0
 
 const RESET_ROUND_DELAY_MS = 1000
 
+const stageCount = computed(() => {
+  return stageTargetMemes.value.length
+})
+
+const stageNumber = computed(() => {
+  return stageIndex.value + 1
+})
+
 const isCardDisabled = computed(() => {
-  return clickedMemeId.value !== null || !hasAudioPlayed.value
+  return clickedMemeId.value !== null || (!hasAudioPlayed.value && !isAudioUnavailable.value)
 })
 
 const actionButtonText = computed(() => {
@@ -73,13 +91,90 @@ const isActionButtonDisabled = computed(() => {
 })
 
 /**
- * Loads a new random selection of memes and picks one target meme.
+ * Starts a new match with one stage per catalogue meme, in random order.
  */
-function refreshSelection(): void {
-  if (memeCatalogue.value.length > 0) {
-    selectedMemes.value = pickRandomMemes(cardCount.value)
-    const randomIndex = Math.floor(Math.random() * selectedMemes.value.length)
-    activeMeme.value = selectedMemes.value[randomIndex] ?? null
+function startMatch(): void {
+  if (memeCatalogue.value.length === 0) {
+    return
+  }
+  stageTargetMemes.value = shuffleMemes(memeCatalogue.value)
+  stageIndex.value = 0
+  correctAnswerCount.value = 0
+  isMatchComplete.value = false
+  void loadStage()
+}
+
+/**
+ * Picks the current stage's memes, waits for their thumbnails and the target audio to load, then reveals the cards and autoplays the audio.
+ * @returns Resolves once the stage is revealed or superseded by a newer load.
+ */
+async function loadStage(): Promise<void> {
+  const generation = ++stageLoadGeneration
+  const targetMeme = stageTargetMemes.value[stageIndex.value]
+  if (targetMeme === undefined) {
+    return
+  }
+
+  isStageLoading.value = true
+  clickedMemeId.value = null
+  hasAudioPlayed.value = false
+  isAudioUnavailable.value = false
+  clearResetTimeout()
+  stopSoundEffects()
+
+  selectedMemes.value = pickStageMemes(targetMeme, cardCount.value)
+  activeMeme.value = targetMeme
+
+  const thumbnailLoads = selectedMemes.value.map((meme) => {
+    const thumbnailUrl = getYouTubeThumbnailUrl(meme.url)
+    return thumbnailUrl !== null ? preloadImage(thumbnailUrl) : Promise.resolve()
+  })
+  await Promise.all([
+    ...thumbnailLoads,
+    loadAudio(),
+  ])
+
+  if (generation !== stageLoadGeneration) {
+    return
+  }
+
+  isStageLoading.value = false
+  autoplayAudio()
+}
+
+/**
+ * Moves to the next stage, or completes the match after the last one.
+ */
+function advanceStage(): void {
+  if (stageNumber.value >= stageCount.value) {
+    stageLoadGeneration++
+    stopSoundEffects()
+    audioPlayer?.destroy()
+    isMatchComplete.value = true
+    return
+  }
+  stageIndex.value++
+  void loadStage()
+}
+
+/**
+ * Mounts the audio player for the active meme.
+ * @returns Resolves once the audio is ready to play or has failed to load.
+ */
+function loadAudio(): Promise<void> {
+  return new Promise((resolve) => {
+    resolveAudioLoad = resolve
+    setupAudioPlayer()
+  })
+}
+
+/**
+ * Resolves the pending audio load, if any.
+ */
+function settleAudioLoad(): void {
+  if (resolveAudioLoad !== null) {
+    resolveAudioLoad()
+    resolveAudioLoad = null
   }
 }
 
@@ -120,30 +215,21 @@ function stopSoundEffects(): void {
 }
 
 /**
- * Resets match state by clearing selection, picking fresh memes, and reloading audio.
+ * Cancels the pending transition to the next stage.
  */
-function resetRound(): void {
-  clickedMemeId.value = null
-  isPlayerReady.value = false
-  hasAudioPlayed.value = false
+function clearResetTimeout(): void {
   if (resetTimeoutId !== null) {
     clearTimeout(resetTimeoutId)
     resetTimeoutId = null
   }
-  stopSoundEffects()
-  const previousActiveMeme = activeMeme.value
-  refreshSelection()
-  if (previousActiveMeme === activeMeme.value && activeMeme.value !== null) {
-    setupAudioPlayer()
-  }
 }
 
 /**
- * Handles meme card selection, visual match feedback, sound cutoff, and scheduled reset.
+ * Handles meme card selection, visual match feedback, sound cutoff, and scheduled stage advance.
  * @param meme - Clicked meme card.
  */
 function handleCardClick(meme: Meme): void {
-  if (clickedMemeId.value !== null || activeMeme.value === null || !hasAudioPlayed.value) {
+  if (isCardDisabled.value || activeMeme.value === null) {
     return
   }
 
@@ -155,6 +241,9 @@ function handleCardClick(meme: Meme): void {
   }
 
   const isCorrect = meme.id === activeMeme.value.id
+  if (isCorrect) {
+    correctAnswerCount.value++
+  }
   playSoundEffect(isCorrect ? winAudio : failAudio)
 
   const selectedVideoId = extractYouTubeVideoId(meme.url) ?? undefined
@@ -168,7 +257,8 @@ function handleCardClick(meme: Meme): void {
   })
 
   resetTimeoutId = setTimeout(() => {
-    resetRound()
+    resetTimeoutId = null
+    advanceStage()
   }, RESET_ROUND_DELAY_MS)
 }
 
@@ -185,22 +275,39 @@ function setupAudioPlayer(): void {
       onError: (): void => {
         isPlayerReady.value = false
         isPlaying.value = false
+        isAudioUnavailable.value = true
+        settleAudioLoad()
       },
       onPlaying: (): void => {
         hasAudioPlayed.value = true
+        isPlaying.value = true
       },
       onReady: (): void => {
         isPlayerReady.value = true
+        settleAudioLoad()
       },
     })
   }
 
-  if (activeMeme.value !== null && playerHostElement.value !== null) {
-    const videoId = extractYouTubeVideoId(activeMeme.value.url)
-    if (videoId !== null) {
-      void audioPlayer.mount(playerHostElement.value, videoId)
-    }
+  const videoId = activeMeme.value !== null ? extractYouTubeVideoId(activeMeme.value.url) : null
+  if (videoId !== null && playerHostElement.value !== null) {
+    void audioPlayer.mount(playerHostElement.value, videoId)
+  } else {
+    isAudioUnavailable.value = true
+    settleAudioLoad()
   }
+}
+
+/**
+ * Starts the active meme's audio as soon as the stage is revealed.
+ * Browsers may block it without a prior user gesture, in which case the play button stays available.
+ */
+function autoplayAudio(): void {
+  if (isConfirmOpen.value || !isPlayerReady.value || activeMeme.value === null || audioPlayer === null) {
+    return
+  }
+
+  audioPlayer.play()
 }
 
 /**
@@ -228,18 +335,13 @@ function handleTogglePlayback(): void {
 }
 
 /**
- * Stops active audio playback, sound effects, and pending round transitions.
+ * Stops active audio playback, sound effects, and pending stage transitions.
  */
 function haltPlayback(): void {
-  if (isPlaying.value) {
-    audioPlayer?.stop()
-    isPlaying.value = false
-  }
+  audioPlayer?.stop()
+  isPlaying.value = false
   stopSoundEffects()
-  if (resetTimeoutId !== null) {
-    clearTimeout(resetTimeoutId)
-    resetTimeoutId = null
-  }
+  clearResetTimeout()
 }
 
 /**
@@ -264,8 +366,17 @@ function handleCancelLeave(): void {
   targetRoute.value = null
 }
 
+/**
+ * Returns to the main menu after the match is complete.
+ */
+function handleMenuClick(): void {
+  void router.push({
+    name: 'home',
+  })
+}
+
 onBeforeRouteLeave((to) => {
-  if (isNavigationConfirmed.value) {
+  if (isNavigationConfirmed.value || isMatchComplete.value) {
     return true
   }
 
@@ -277,14 +388,12 @@ onBeforeRouteLeave((to) => {
 })
 
 onMounted(() => {
-  refreshSelection()
+  startMatch()
 })
 
 onUnmounted(() => {
-  if (resetTimeoutId !== null) {
-    clearTimeout(resetTimeoutId)
-    resetTimeoutId = null
-  }
+  stageLoadGeneration++
+  clearResetTimeout()
   if (audioPlayer !== null) {
     audioPlayer.destroy()
     audioPlayer = null
@@ -296,24 +405,15 @@ watch(
   () => difficulty.value,
   () => {
     haltPlayback()
-    resetRound()
+    startMatch()
   },
 )
 
 watch(
   () => memeCatalogue.value,
   () => {
-    if (selectedMemes.value.length === 0) {
-      refreshSelection()
-    }
-  },
-)
-
-watch(
-  () => activeMeme.value,
-  (newMeme) => {
-    if (newMeme !== null && playerHostElement.value !== null) {
-      setupAudioPlayer()
+    if (stageTargetMemes.value.length === 0) {
+      startMatch()
     }
   },
 )
@@ -333,77 +433,116 @@ watch(
     />
 
     <div
-      class="content"
-      :class="`content--${difficulty}`"
+      v-if="isMatchComplete"
+      class="results"
     >
-      <div
-        class="thumbnails"
-        :class="`thumbnails--${difficulty}`"
-      >
-        <button
-          v-for="meme in selectedMemes"
-          :key="meme.id"
-          type="button"
-          class="card"
-          :class="{
-            'is-correct': clickedMemeId === meme.id && meme.id === activeMeme?.id,
-            'is-incorrect': clickedMemeId === meme.id && meme.id !== activeMeme?.id,
-          }"
-          :disabled="isCardDisabled"
-          @click="handleCardClick(meme)"
-        >
-          <img
-            :src="getThumbnailUrl(meme.url)"
-            :alt="meme.name"
-            class="thumbnail-image"
-            width="320"
-            height="180"
-            loading="eager"
-          >
-          <div
-            v-if="clickedMemeId === meme.id"
-            class="feedback-overlay"
-            aria-hidden="true"
-          >
-            <svg
-              v-if="meme.id === activeMeme?.id"
-              class="feedback-icon is-correct"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="3.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-            <svg
-              v-else
-              class="feedback-icon is-incorrect"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="3.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </div>
-        </button>
-      </div>
-
+      <h2 class="results-title">
+        Match complete
+      </h2>
+      <p class="results-score">
+        {{ correctAnswerCount }}/{{ stageCount }}
+      </p>
+      <p class="results-caption">
+        memes guessed right
+      </p>
       <button
         type="button"
         class="action-button"
-        :class="{'is-playing': isPlaying}"
-        :disabled="isActionButtonDisabled"
-        @click="handleTogglePlayback"
+        @click="handleMenuClick"
       >
-        {{ actionButtonText }}
+        MENU
       </button>
     </div>
+
+    <template v-else>
+      <p
+        v-if="stageCount > 0"
+        class="stage-counter"
+      >
+        <span class="visually-hidden">Stage </span>{{ stageNumber }}/{{ stageCount }}
+      </p>
+
+      <div
+        v-if="isStageLoading"
+        class="stage-loading"
+      >
+        <LoadingSpinner label="Loading stage" />
+      </div>
+
+      <div
+        v-else
+        class="content"
+        :class="`content--${difficulty}`"
+      >
+        <div
+          class="thumbnails"
+          :class="`thumbnails--${difficulty}`"
+        >
+          <button
+            v-for="meme in selectedMemes"
+            :key="meme.id"
+            type="button"
+            class="card"
+            :class="{
+              'is-correct': clickedMemeId === meme.id && meme.id === activeMeme?.id,
+              'is-incorrect': clickedMemeId === meme.id && meme.id !== activeMeme?.id,
+            }"
+            :disabled="isCardDisabled"
+            @click="handleCardClick(meme)"
+          >
+            <img
+              :src="getThumbnailUrl(meme.url)"
+              :alt="meme.name"
+              class="thumbnail-image"
+              width="320"
+              height="180"
+              loading="eager"
+            >
+            <div
+              v-if="clickedMemeId === meme.id"
+              class="feedback-overlay"
+              aria-hidden="true"
+            >
+              <svg
+                v-if="meme.id === activeMeme?.id"
+                class="feedback-icon is-correct"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="3.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              <svg
+                v-else
+                class="feedback-icon is-incorrect"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="3.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </div>
+          </button>
+        </div>
+
+        <button
+          type="button"
+          class="action-button"
+          :class="{'is-playing': isPlaying}"
+          :disabled="isActionButtonDisabled"
+          @click="handleTogglePlayback"
+        >
+          {{ actionButtonText }}
+        </button>
+      </div>
+    </template>
 
     <ConfirmDialog
       :is-open="isConfirmOpen"
@@ -419,12 +558,15 @@ watch(
   --safe-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
   --safe-right: max(1rem, env(safe-area-inset-right, 0px));
   --safe-left: max(1rem, env(safe-area-inset-left, 0px));
-  --ui-overhead: calc(var(--safe-top) + var(--safe-bottom) + 44px + 0.75rem);
+  --counter-size: 1.75rem;
+  --ui-overhead: calc(var(--safe-top) + var(--safe-bottom) + var(--counter-size) + 44px + 2 * 0.75rem);
 
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 0.75rem;
   height: 100dvh;
   max-height: 100dvh;
   width: 100%;
@@ -448,13 +590,82 @@ watch(
   border-width: 0;
 }
 
+.stage-counter {
+  flex-shrink: 0;
+  margin-bottom: auto;
+  font-family: var(--font-display);
+  font-size: var(--counter-size);
+  line-height: 1;
+  letter-spacing: 0.06em;
+  color: var(--text-main);
+  font-variant-numeric: tabular-nums;
+  -webkit-text-stroke: 1.5px #000000;
+  paint-order: stroke fill;
+  text-shadow: 0 4px 12px rgb(0 0 0 / 50%);
+}
+
+.stage-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.results {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  text-align: center;
+}
+
+.results-title {
+  font-family: var(--font-display);
+  font-size: clamp(2.25rem, 7vw, 3.25rem);
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-main);
+  line-height: 1.05;
+  -webkit-text-stroke: 2.5px #000000;
+  paint-order: stroke fill;
+  text-shadow: 0 6px 18px rgb(0 0 0 / 50%);
+}
+
+.results-score {
+  font-family: var(--font-display);
+  font-size: clamp(5rem, 22vw, 11rem);
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  -webkit-text-stroke: 4px #000000;
+  paint-order: stroke fill;
+  text-shadow: 0 8px 24px rgb(0 0 0 / 50%);
+}
+
+.results-caption {
+  font-family: var(--font-ui);
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-main);
+  text-shadow: 0 2px 8px rgb(0 0 0 / 60%);
+}
+
+.results .action-button {
+  margin-top: 2rem;
+}
+
 .content {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: space-between;
-  height: 100%;
-  max-height: 100%;
+  flex: 1 1 0;
+  min-height: 0;
   width: 100%;
   max-width: 480px;
   gap: 0.75rem;
@@ -636,6 +847,7 @@ watch(
 @media (min-width: 768px) {
   .match-screen {
     --card-gap: 1.5rem;
+    --counter-size: 2.25rem;
     height: auto;
     min-height: 100%;
     max-height: none;
@@ -644,6 +856,7 @@ watch(
   }
 
   .content {
+    flex: 1 0 auto;
     height: auto;
     max-height: none;
     max-width: 100%;
