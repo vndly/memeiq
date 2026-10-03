@@ -41,22 +41,25 @@ const isStageLoading = ref(true)
 const isMatchComplete = ref(false)
 const selectedMemes = ref<Meme[]>([])
 const activeMeme = ref<Meme | null>(null)
-const isPlaying = ref(false)
 const isPlayerReady = ref(false)
 const isAudioUnavailable = ref(false)
 const playerHostElement = ref<HTMLElement | null>(null)
 const clickedMemeId = ref<number | null>(null)
 const hasAudioPlayed = ref(false)
+const isPlayButtonVisible = ref(false)
+const isPlayButtonPressed = ref(false)
 
 const winAudio = typeof Audio !== 'undefined' ? new Audio(winAudioUrl) : null
 const failAudio = typeof Audio !== 'undefined' ? new Audio(failAudioUrl) : null
 
 let audioPlayer: YouTubeAudioPlayer | null = null
 let resetTimeoutId: ReturnType<typeof setTimeout> | null = null
+let autoplayCheckTimeoutId: ReturnType<typeof setTimeout> | null = null
 let resolveAudioLoad: (() => void) | null = null
 let stageLoadGeneration = 0
 
 const RESET_ROUND_DELAY_MS = 1000
+const AUTOPLAY_CHECK_DELAY_MS = 2000
 
 const stageCount = computed(() => {
   return stageTargetMemes.value.length
@@ -70,24 +73,8 @@ const isCardDisabled = computed(() => {
   return clickedMemeId.value !== null || (!hasAudioPlayed.value && !isAudioUnavailable.value)
 })
 
-const actionButtonText = computed(() => {
-  if (isPlaying.value) {
-    return 'STOP'
-  }
-  if (clickedMemeId.value !== null || !isPlayerReady.value || activeMeme.value === null) {
-    return 'LOADING...'
-  }
-  return 'PLAY'
-})
-
-const isActionButtonDisabled = computed(() => {
-  if (clickedMemeId.value !== null) {
-    return true
-  }
-  if (isPlaying.value) {
-    return false
-  }
-  return !isPlayerReady.value || activeMeme.value === null
+const isPlayButtonDisabled = computed(() => {
+  return isPlayButtonPressed.value || clickedMemeId.value !== null || !isPlayerReady.value
 })
 
 /**
@@ -119,7 +106,10 @@ async function loadStage(): Promise<void> {
   clickedMemeId.value = null
   hasAudioPlayed.value = false
   isAudioUnavailable.value = false
+  isPlayButtonVisible.value = false
+  isPlayButtonPressed.value = false
   clearResetTimeout()
+  clearAutoplayCheckTimeout()
   stopSoundEffects()
 
   selectedMemes.value = pickStageMemes(targetMeme, cardCount.value)
@@ -148,6 +138,7 @@ async function loadStage(): Promise<void> {
 function advanceStage(): void {
   if (stageNumber.value >= stageCount.value) {
     stageLoadGeneration++
+    clearAutoplayCheckTimeout()
     stopSoundEffects()
     audioPlayer?.destroy()
     isMatchComplete.value = true
@@ -225,6 +216,16 @@ function clearResetTimeout(): void {
 }
 
 /**
+ * Cancels the pending check for blocked autoplay.
+ */
+function clearAutoplayCheckTimeout(): void {
+  if (autoplayCheckTimeoutId !== null) {
+    clearTimeout(autoplayCheckTimeoutId)
+    autoplayCheckTimeoutId = null
+  }
+}
+
+/**
  * Handles meme card selection, visual match feedback, sound cutoff, and scheduled stage advance.
  * @param meme - Clicked meme card.
  */
@@ -234,11 +235,7 @@ function handleCardClick(meme: Meme): void {
   }
 
   clickedMemeId.value = meme.id
-
-  if (isPlaying.value) {
-    audioPlayer?.stop()
-    isPlaying.value = false
-  }
+  audioPlayer?.stop()
 
   const isCorrect = meme.id === activeMeme.value.id
   if (isCorrect) {
@@ -270,17 +267,18 @@ function setupAudioPlayer(): void {
   if (audioPlayer === null) {
     audioPlayer = new YouTubeAudioPlayer({
       onEnded: (): void => {
-        isPlaying.value = false
+        // Audio is played once per stage; nothing to reset when it ends
       },
       onError: (): void => {
         isPlayerReady.value = false
-        isPlaying.value = false
         isAudioUnavailable.value = true
         settleAudioLoad()
       },
       onPlaying: (): void => {
         hasAudioPlayed.value = true
-        isPlaying.value = true
+        if (!isPlayButtonPressed.value) {
+          isPlayButtonVisible.value = false
+        }
       },
       onReady: (): void => {
         isPlayerReady.value = true
@@ -300,10 +298,18 @@ function setupAudioPlayer(): void {
 
 /**
  * Starts the active meme's audio as soon as the stage is revealed.
- * Browsers may block it without a prior user gesture, in which case the play button stays available.
+ * Browsers may block it without a prior user gesture, so the play button is shown if the audio has not started shortly after.
  */
 function autoplayAudio(): void {
-  if (isConfirmOpen.value || !isPlayerReady.value || activeMeme.value === null || audioPlayer === null) {
+  clearAutoplayCheckTimeout()
+  autoplayCheckTimeoutId = setTimeout(() => {
+    autoplayCheckTimeoutId = null
+    if (!hasAudioPlayed.value && !isAudioUnavailable.value) {
+      isPlayButtonVisible.value = true
+    }
+  }, AUTOPLAY_CHECK_DELAY_MS)
+
+  if (isConfirmOpen.value || !isPlayerReady.value || audioPlayer === null) {
     return
   }
 
@@ -311,21 +317,15 @@ function autoplayAudio(): void {
 }
 
 /**
- * Toggles meme audio playback (plays when ready/stopped, stops when playing).
+ * Plays the meme audio once after the browser blocked autoplay.
  */
-function handleTogglePlayback(): void {
-  if (isPlaying.value) {
-    audioPlayer?.stop()
-    isPlaying.value = false
+function handlePlayClick(): void {
+  if (isPlayButtonDisabled.value || activeMeme.value === null || audioPlayer === null) {
     return
   }
 
-  if (!isPlayerReady.value || activeMeme.value === null || audioPlayer === null) {
-    return
-  }
-
+  isPlayButtonPressed.value = true
   hasAudioPlayed.value = true
-  isPlaying.value = true
   const videoId = extractYouTubeVideoId(activeMeme.value.url) ?? undefined
   analytics.trackAudioPlay({
     videoId: videoId,
@@ -339,7 +339,6 @@ function handleTogglePlayback(): void {
  */
 function haltPlayback(): void {
   audioPlayer?.stop()
-  isPlaying.value = false
   stopSoundEffects()
   clearResetTimeout()
 }
@@ -364,6 +363,10 @@ function handleCancelLeave(): void {
   analytics.trackMatchStay()
   isConfirmOpen.value = false
   targetRoute.value = null
+  // Restart the audio that was cut off when the dialog opened
+  if (!isStageLoading.value && !isMatchComplete.value && clickedMemeId.value === null && hasAudioPlayed.value) {
+    audioPlayer?.play()
+  }
 }
 
 /**
@@ -394,6 +397,7 @@ onMounted(() => {
 onUnmounted(() => {
   stageLoadGeneration++
   clearResetTimeout()
+  clearAutoplayCheckTimeout()
   if (audioPlayer !== null) {
     audioPlayer.destroy()
     audioPlayer = null
@@ -535,11 +539,11 @@ watch(
         <button
           type="button"
           class="action-button"
-          :class="{'is-playing': isPlaying}"
-          :disabled="isActionButtonDisabled"
-          @click="handleTogglePlayback"
+          :class="{'is-hidden': !isPlayButtonVisible}"
+          :disabled="isPlayButtonDisabled"
+          @click="handlePlayClick"
         >
-          {{ actionButtonText }}
+          PLAY
         </button>
       </div>
     </template>
@@ -828,10 +832,8 @@ watch(
   filter: none;
 }
 
-.action-button.is-playing {
-  background: #ff3b30;
-  border-color: #ffffff;
-  color: #ffffff;
+.action-button.is-hidden {
+  visibility: hidden;
 }
 
 .audio-player-host {
