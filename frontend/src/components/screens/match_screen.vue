@@ -8,8 +8,8 @@ import ConfirmDialog from '@/components/confirm_dialog.vue'
 import LoadingSpinner from '@/components/loading_spinner.vue'
 import {DEFAULT_DIFFICULTY, DIFFICULTY_CARD_COUNTS, THUMBNAIL_RATIO} from '@/constants'
 import {analytics} from '@/services/analytics'
-import {preloadImage} from '@/services/image_preloader'
 import {memeCatalogue, pickStageMemes, shuffleMemes} from '@/services/meme_catalogue'
+import {loadThumbnail} from '@/services/thumbnail_loader'
 import {extractYouTubeVideoId, getYouTubeThumbnailUrl} from '@/services/youtube'
 import {YouTubeAudioPlayer} from '@/services/youtube_player'
 import {isDifficulty} from '@/types/difficulty'
@@ -40,6 +40,7 @@ const correctAnswerCount = ref(0)
 const isStageLoading = ref(true)
 const isMatchComplete = ref(false)
 const selectedMemes = ref<Meme[]>([])
+const thumbnailUrls = ref<Record<number, string>>({})
 const activeMeme = ref<Meme | null>(null)
 const isPlayerReady = ref(false)
 const isAudioUnavailable = ref(false)
@@ -115,12 +116,16 @@ async function loadStage(): Promise<void> {
   selectedMemes.value = pickStageMemes(targetMeme, cardCount.value)
   activeMeme.value = targetMeme
 
-  const thumbnailLoads = selectedMemes.value.map((meme) => {
+  const thumbnailLoads = selectedMemes.value.map(async (meme) => {
     const thumbnailUrl = getYouTubeThumbnailUrl(meme.url)
-    return thumbnailUrl !== null ? preloadImage(thumbnailUrl) : Promise.resolve()
+    const loadedUrl = thumbnailUrl !== null ? await loadThumbnail(thumbnailUrl) : ''
+    return [
+      meme.id,
+      loadedUrl,
+    ] as const
   })
-  await Promise.all([
-    ...thumbnailLoads,
+  const [loadedThumbnails] = await Promise.all([
+    Promise.all(thumbnailLoads),
     loadAudio(),
   ])
 
@@ -128,6 +133,7 @@ async function loadStage(): Promise<void> {
     return
   }
 
+  thumbnailUrls.value = Object.fromEntries(loadedThumbnails)
   isStageLoading.value = false
   autoplayAudio()
 }
@@ -170,12 +176,12 @@ function settleAudioLoad(): void {
 }
 
 /**
- * Resolves the YouTube thumbnail URL for a given video URL.
- * @param videoUrl - Full URL to YouTube video.
- * @returns URL string for the thumbnail image.
+ * Resolves the image shown on a meme card, trimmed of black bands when possible.
+ * @param meme - Meme shown on the card.
+ * @returns URL string for the card image.
  */
-function getThumbnailUrl(videoUrl: string): string {
-  return getYouTubeThumbnailUrl(videoUrl) ?? ''
+function getCardImageUrl(meme: Meme): string {
+  return thumbnailUrls.value[meme.id] ?? getYouTubeThumbnailUrl(meme.url) ?? ''
 }
 
 /**
@@ -473,11 +479,7 @@ watch(
         <LoadingSpinner label="Loading stage" />
       </div>
 
-      <div
-        v-else
-        class="content"
-        :class="`content--${difficulty}`"
-      >
+      <template v-else>
         <div
           class="thumbnails"
           :class="`thumbnails--${difficulty}`"
@@ -495,7 +497,7 @@ watch(
             @click="handleCardClick(meme)"
           >
             <img
-              :src="getThumbnailUrl(meme.url)"
+              :src="getCardImageUrl(meme)"
               :alt="meme.name"
               class="thumbnail-image"
               width="320"
@@ -538,14 +540,14 @@ watch(
 
         <button
           type="button"
-          class="action-button"
+          class="action-button play-button"
           :class="{'is-hidden': !isPlayButtonVisible}"
           :disabled="isPlayButtonDisabled"
           @click="handlePlayClick"
         >
           PLAY
         </button>
-      </div>
+      </template>
     </template>
 
     <ConfirmDialog
@@ -563,14 +565,17 @@ watch(
   --safe-right: max(1rem, env(safe-area-inset-right, 0px));
   --safe-left: max(1rem, env(safe-area-inset-left, 0px));
   --counter-size: 1.75rem;
-  --ui-overhead: calc(var(--safe-top) + var(--safe-bottom) + var(--counter-size) + 44px + 2 * 0.75rem);
+  --button-height: 44px;
+  --stage-gap: 0.75rem;
+  /* Rows above and below the cards share the same height, sized for the taller of counter and button */
+  --ui-overhead: calc(var(--safe-top) + var(--safe-bottom) + 2 * var(--button-height) + 2 * var(--stage-gap));
 
   position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
+  display: grid;
+  grid-template-rows: 1fr auto 1fr;
+  grid-template-columns: 100%;
+  justify-items: center;
+  row-gap: var(--stage-gap);
   height: 100dvh;
   max-height: 100dvh;
   width: 100%;
@@ -595,8 +600,8 @@ watch(
 }
 
 .stage-counter {
-  flex-shrink: 0;
-  margin-bottom: auto;
+  grid-row: 1;
+  align-self: start;
   font-family: var(--font-display);
   font-size: var(--counter-size);
   line-height: 1;
@@ -617,7 +622,8 @@ watch(
 }
 
 .results {
-  flex: 1 0 auto;
+  grid-row: 1 / -1;
+  align-self: center;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -663,24 +669,12 @@ watch(
   margin-top: 2rem;
 }
 
-.content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: space-between;
-  flex: 1 1 0;
-  min-height: 0;
-  width: 100%;
-  max-width: 480px;
-  gap: 0.75rem;
-}
-
 .thumbnails {
   --mobile-card-gap: 0.5rem;
+  grid-row: 2;
   display: grid;
-  flex: 1 1 0;
-  min-height: 0;
   width: 100%;
+  max-width: 480px;
   gap: var(--mobile-card-gap);
   align-content: center;
   justify-content: center;
@@ -832,6 +826,11 @@ watch(
   filter: none;
 }
 
+.play-button {
+  grid-row: 3;
+  align-self: end;
+}
+
 .action-button.is-hidden {
   visibility: hidden;
 }
@@ -850,6 +849,7 @@ watch(
   .match-screen {
     --card-gap: 1.5rem;
     --counter-size: 2.25rem;
+    --stage-gap: 2.75rem;
     height: auto;
     min-height: 100%;
     max-height: none;
@@ -857,19 +857,8 @@ watch(
     padding: 1.5rem var(--card-gap);
   }
 
-  .content {
-    flex: 1 0 auto;
-    height: auto;
-    max-height: none;
-    max-width: 100%;
-    justify-content: center;
-    gap: 2.75rem;
-  }
-
   .thumbnails {
-    flex: none;
-    height: auto;
-    width: 100%;
+    max-width: 100%;
     gap: var(--card-gap);
   }
 
@@ -909,6 +898,10 @@ watch(
   .action-button {
     min-height: 48px;
     padding: 0.75rem 1.5rem;
+  }
+
+  .play-button {
+    align-self: start;
   }
 }
 
