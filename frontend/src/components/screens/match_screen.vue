@@ -113,7 +113,7 @@ async function loadStage(): Promise<void> {
   clearAutoplayCheckTimeout()
   stopSoundEffects()
 
-  selectedMemes.value = pickStageMemes(targetMeme, cardCount.value)
+  selectedMemes.value = pickStageMemes(targetMeme, cardCount.value, stageTargetMemes.value.slice(0, stageIndex.value))
   activeMeme.value = targetMeme
 
   const thumbnailLoads = selectedMemes.value.map(async (meme) => {
