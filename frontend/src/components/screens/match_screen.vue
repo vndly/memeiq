@@ -809,7 +809,7 @@ watch(
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  gap: 2rem;
   text-align: center;
 }
 
@@ -831,7 +831,7 @@ watch(
   align-items: baseline;
   gap: 0.15em;
   font-family: var(--font-display);
-  font-size: clamp(5rem, 22vw, 11rem);
+  font-size: clamp(3.5rem, 14vw, 6.5rem);
   line-height: 1;
   letter-spacing: 0.02em;
   paint-order: stroke fill;
@@ -839,17 +839,15 @@ watch(
 }
 
 .results-iq-unit {
-  font-size: 0.36em;
-  letter-spacing: 0.06em;
   color: var(--text-main);
-  -webkit-text-stroke: 2.5px #000000;
+  -webkit-text-stroke: 3px #000000;
   paint-order: stroke fill;
 }
 
 .results-iq-value {
   color: var(--accent);
   font-variant-numeric: tabular-nums;
-  -webkit-text-stroke: 4px #000000;
+  -webkit-text-stroke: 3px #000000;
   paint-order: stroke fill;
 }
 
