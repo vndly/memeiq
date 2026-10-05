@@ -75,7 +75,7 @@ function handleStartClick(): void {
             class="selector-caption"
             aria-hidden="true"
           >
-            MEMES
+            Memes
           </p>
           <fieldset class="option-selector">
             <legend class="visually-hidden">
@@ -97,25 +97,33 @@ function handleStartClick(): void {
             </label>
           </fieldset>
         </div>
-        <fieldset class="option-selector">
-          <legend class="visually-hidden">
-            Difficulty
-          </legend>
-          <label
-            v-for="option in DIFFICULTY_OPTIONS"
-            :key="option.difficulty"
-            class="option"
+        <div class="selector-group">
+          <p
+            class="selector-caption"
+            aria-hidden="true"
           >
-            <input
-              v-model="selectedDifficulty"
-              type="radio"
-              name="difficulty"
-              class="option-input"
-              :value="option.difficulty"
+            Difficulty
+          </p>
+          <fieldset class="option-selector">
+            <legend class="visually-hidden">
+              Difficulty
+            </legend>
+            <label
+              v-for="option in DIFFICULTY_OPTIONS"
+              :key="option.difficulty"
+              class="option"
             >
-            <span class="option-label">{{ option.label }}</span>
-          </label>
-        </fieldset>
+              <input
+                v-model="selectedDifficulty"
+                type="radio"
+                name="difficulty"
+                class="option-input"
+                :value="option.difficulty"
+              >
+              <span class="option-label">{{ option.label }}</span>
+            </label>
+          </fieldset>
+        </div>
         <button
           type="button"
           class="menu-button"
@@ -173,14 +181,21 @@ function handleStartClick(): void {
   gap: 0.5rem;
 }
 
+.selector-group + .selector-group {
+  margin-top: 0.75rem;
+}
+
 .selector-caption {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.16em;
+  font-family: var(--font-display);
+  font-size: 1.625rem;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--text-main);
   text-align: center;
-  text-shadow: 0 2px 8px rgb(0 0 0 / 70%);
+  -webkit-text-stroke: 1.5px #000000;
+  paint-order: stroke fill;
+  text-shadow: 0 4px 12px rgb(0 0 0 / 50%);
 }
 
 .option-selector {
