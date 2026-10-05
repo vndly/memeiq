@@ -31,3 +31,9 @@ export const MATCH_LENGTH_MEME_COUNTS: Record<MatchLength, number> = {
   medium: 20,
   full: Infinity,
 }
+
+/** Highest IQ a match can award, split evenly across its memes. */
+export const MAX_IQ_SCORE = 150
+
+/** Seconds of answer time that cost one IQ point on a correct pick. */
+export const IQ_PENALTY_SECONDS_PER_POINT = 3

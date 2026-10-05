@@ -7,7 +7,7 @@ import winAudioUrl from '@/assets/win.mp3'
 import ConfirmDialog from '@/components/confirm_dialog.vue'
 import LoadingSpinner from '@/components/loading_spinner.vue'
 import PauseDialog from '@/components/pause_dialog.vue'
-import {DEFAULT_DIFFICULTY, DEFAULT_MATCH_LENGTH, DIFFICULTY_CARD_COUNTS, THUMBNAIL_RATIO} from '@/constants'
+import {DEFAULT_DIFFICULTY, DEFAULT_MATCH_LENGTH, DIFFICULTY_CARD_COUNTS, IQ_PENALTY_SECONDS_PER_POINT, MAX_IQ_SCORE, THUMBNAIL_RATIO} from '@/constants'
 import {analytics} from '@/services/analytics'
 import {getMatchMemeCount, memeCatalogue, pickStageMemes, shuffleMemes} from '@/services/meme_catalogue'
 import {loadThumbnail} from '@/services/thumbnail_loader'
@@ -49,6 +49,7 @@ const cardCount = computed<number>(() => {
 const stageTargetMemes = ref<Meme[]>([])
 const stageIndex = ref(0)
 const correctAnswerCount = ref(0)
+const iqScore = ref(0)
 const isStageLoading = ref(true)
 const isMatchComplete = ref(false)
 const selectedMemes = ref<Meme[]>([])
@@ -71,6 +72,9 @@ let autoplayCheckTimeoutId: ReturnType<typeof setTimeout> | null = null
 let resolveAudioLoad: (() => void) | null = null
 let isAudioPausedByDialog = false
 let stageLoadGeneration = 0
+let isStageClockStarted = false
+let stageClockRunningSince: number | null = null
+let stageClockElapsedMs = 0
 
 const RESET_ROUND_DELAY_MS = 1000
 const AUTOPLAY_CHECK_DELAY_MS = 2000
@@ -95,6 +99,10 @@ const isDialogOpen = computed(() => {
   return isPauseOpen.value || isConfirmOpen.value
 })
 
+const roundedIqScore = computed(() => {
+  return Math.round(iqScore.value)
+})
+
 /**
  * Starts a new match with one stage per randomly picked catalogue meme, as many as the match length allows.
  */
@@ -105,6 +113,7 @@ function startMatch(): void {
   stageTargetMemes.value = shuffleMemes(memeCatalogue.value).slice(0, getMatchMemeCount(matchLength.value))
   stageIndex.value = 0
   correctAnswerCount.value = 0
+  iqScore.value = 0
   isMatchComplete.value = false
   void loadStage()
 }
@@ -126,6 +135,7 @@ async function loadStage(): Promise<void> {
   isAudioUnavailable.value = false
   isPlayButtonVisible.value = false
   isPlayButtonPressed.value = false
+  resetStageClock()
   clearResetTimeout()
   clearAutoplayCheckTimeout()
   stopSoundEffects()
@@ -152,6 +162,9 @@ async function loadStage(): Promise<void> {
 
   thumbnailUrls.value = Object.fromEntries(loadedThumbnails)
   isStageLoading.value = false
+  if (isAudioUnavailable.value) {
+    startStageClock()
+  }
   autoplayAudio()
 }
 
@@ -249,6 +262,64 @@ function clearAutoplayCheckTimeout(): void {
 }
 
 /**
+ * Clears the current stage's answer clock.
+ */
+function resetStageClock(): void {
+  isStageClockStarted = false
+  stageClockRunningSince = null
+  stageClockElapsedMs = 0
+}
+
+/**
+ * Starts the current stage's answer clock once; it stays frozen while a dialog is open.
+ */
+function startStageClock(): void {
+  if (isStageClockStarted) {
+    return
+  }
+  isStageClockStarted = true
+  stageClockRunningSince = isDialogOpen.value ? null : performance.now()
+}
+
+/**
+ * Freezes the current stage's answer clock, keeping the time elapsed so far.
+ */
+function pauseStageClock(): void {
+  if (stageClockRunningSince !== null) {
+    stageClockElapsedMs += performance.now() - stageClockRunningSince
+    stageClockRunningSince = null
+  }
+}
+
+/**
+ * Restarts the current stage's answer clock if it was started and is frozen.
+ */
+function resumeStageClock(): void {
+  if (isStageClockStarted && stageClockRunningSince === null) {
+    stageClockRunningSince = performance.now()
+  }
+}
+
+/**
+ * Measures how long the current stage's answer clock has been running.
+ * @returns Elapsed seconds, excluding frozen time.
+ */
+function getStageElapsedSeconds(): number {
+  const runningMs = stageClockRunningSince !== null ? performance.now() - stageClockRunningSince : 0
+  return (stageClockElapsedMs + runningMs) / 1000
+}
+
+/**
+ * Computes the IQ points earned by a correct pick: an even share of the maximum IQ, minus one point per penalty interval elapsed.
+ * @returns IQ points, never below zero.
+ */
+function getCorrectPickPoints(): number {
+  const baseScore = MAX_IQ_SCORE / stageCount.value
+  const penalty = getStageElapsedSeconds() / IQ_PENALTY_SECONDS_PER_POINT
+  return Math.max(0, baseScore - penalty)
+}
+
+/**
  * Handles meme card selection, visual match feedback, sound cutoff, and scheduled stage advance.
  * @param meme - Clicked meme card.
  */
@@ -263,6 +334,7 @@ function handleCardClick(meme: Meme): void {
   const isCorrect = meme.id === activeMeme.value.id
   if (isCorrect) {
     correctAnswerCount.value++
+    iqScore.value += getCorrectPickPoints()
   }
   playSoundEffect(isCorrect ? winAudio : failAudio)
 
@@ -303,10 +375,14 @@ function setupAudioPlayer(): void {
       onError: (): void => {
         isPlayerReady.value = false
         isAudioUnavailable.value = true
+        if (!isStageLoading.value) {
+          startStageClock()
+        }
         settleAudioLoad()
       },
       onPlaying: (): void => {
         hasAudioPlayed.value = true
+        startStageClock()
         if (!isPlayButtonPressed.value) {
           isPlayButtonVisible.value = false
         }
@@ -357,6 +433,7 @@ function handlePlayClick(): void {
 
   isPlayButtonPressed.value = true
   hasAudioPlayed.value = true
+  startStageClock()
   const videoId = extractYouTubeVideoId(activeMeme.value.url) ?? undefined
   analytics.trackAudioPlay({
     videoId: videoId,
@@ -380,6 +457,7 @@ function haltPlayback(): void {
 function pauseMatch(): void {
   isAudioPausedByDialog = audioPlayer?.playing ?? false
   audioPlayer?.pause()
+  pauseStageClock()
   stopSoundEffects()
   clearResetTimeout()
   isPauseOpen.value = true
@@ -403,6 +481,7 @@ function handleResume(): void {
   analytics.trackMatchResume()
   isPauseOpen.value = false
   targetRoute.value = null
+  resumeStageClock()
   const wasAudioPaused = isAudioPausedByDialog
   isAudioPausedByDialog = false
   if (isStageLoading.value || isMatchComplete.value) {
@@ -527,8 +606,12 @@ watch(
       <h2 class="results-title">
         Match complete
       </h2>
-      <p class="results-score">
-        {{ correctAnswerCount }}/{{ stageCount }}
+      <p class="results-iq">
+        <span class="results-iq-unit">IQ</span>
+        <span class="results-iq-value">{{ roundedIqScore }}</span>
+      </p>
+      <p class="results-correct">
+        {{ correctAnswerCount }}/{{ stageCount }} correct
       </p>
       <button
         type="button"
@@ -743,16 +826,43 @@ watch(
   text-shadow: 0 6px 18px rgb(0 0 0 / 50%);
 }
 
-.results-score {
+.results-iq {
+  display: flex;
+  align-items: baseline;
+  gap: 0.15em;
   font-family: var(--font-display);
   font-size: clamp(5rem, 22vw, 11rem);
   line-height: 1;
   letter-spacing: 0.02em;
+  paint-order: stroke fill;
+  text-shadow: 0 8px 24px rgb(0 0 0 / 50%);
+}
+
+.results-iq-unit {
+  font-size: 0.36em;
+  letter-spacing: 0.06em;
+  color: var(--text-main);
+  -webkit-text-stroke: 2.5px #000000;
+  paint-order: stroke fill;
+}
+
+.results-iq-value {
   color: var(--accent);
   font-variant-numeric: tabular-nums;
   -webkit-text-stroke: 4px #000000;
   paint-order: stroke fill;
-  text-shadow: 0 8px 24px rgb(0 0 0 / 50%);
+}
+
+.results-correct {
+  font-family: var(--font-display);
+  font-size: var(--counter-size);
+  line-height: 1;
+  letter-spacing: 0.06em;
+  color: var(--text-main);
+  font-variant-numeric: tabular-nums;
+  -webkit-text-stroke: 1.5px #000000;
+  paint-order: stroke fill;
+  text-shadow: 0 4px 12px rgb(0 0 0 / 50%);
 }
 
 .results .action-button {
