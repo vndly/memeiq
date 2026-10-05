@@ -10,7 +10,7 @@ interface DifficultyOption {
 }
 
 const router = useRouter()
-const isSelectingDifficulty = ref(false)
+const selectedDifficulty = ref<Difficulty>('medium')
 
 const DIFFICULTY_OPTIONS: readonly DifficultyOption[] = [
   {
@@ -28,22 +28,14 @@ const DIFFICULTY_OPTIONS: readonly DifficultyOption[] = [
 ]
 
 /**
- * Reveals the difficulty options.
+ * Navigates to the match screen with the selected difficulty.
  */
 function handleStartClick(): void {
-  isSelectingDifficulty.value = true
-}
-
-/**
- * Navigates to the match screen with the chosen difficulty.
- * @param difficulty - The chosen match difficulty.
- */
-function selectDifficulty(difficulty: Difficulty): void {
-  analytics.trackMatchStart(difficulty)
+  analytics.trackMatchStart(selectedDifficulty.value)
   void router.push({
     name: 'match',
     query: {
-      difficulty: difficulty,
+      difficulty: selectedDifficulty.value,
     },
   })
 }
@@ -55,33 +47,34 @@ function selectDifficulty(difficulty: Difficulty): void {
       <h1 class="title">
         Meme IQ
       </h1>
-      <Transition
-        name="fade"
-        mode="out-in"
-      >
+      <div class="menu">
+        <fieldset class="difficulty-selector">
+          <legend class="visually-hidden">
+            Difficulty
+          </legend>
+          <label
+            v-for="option in DIFFICULTY_OPTIONS"
+            :key="option.difficulty"
+            class="difficulty-option"
+          >
+            <input
+              v-model="selectedDifficulty"
+              type="radio"
+              name="difficulty"
+              class="difficulty-input"
+              :value="option.difficulty"
+            >
+            <span class="difficulty-label">{{ option.label }}</span>
+          </label>
+        </fieldset>
         <button
-          v-if="!isSelectingDifficulty"
           type="button"
           class="menu-button"
           @click="handleStartClick"
         >
           START
         </button>
-        <div
-          v-else
-          class="difficulty-options"
-        >
-          <button
-            v-for="option in DIFFICULTY_OPTIONS"
-            :key="option.difficulty"
-            type="button"
-            class="menu-button"
-            @click="selectDifficulty(option.difficulty)"
-          >
-            {{ option.label }}
-          </button>
-        </div>
-      </Transition>
+      </div>
     </div>
   </main>
 </template>
@@ -101,6 +94,7 @@ function selectDifficulty(difficulty: Difficulty): void {
   flex-direction: column;
   align-items: center;
   gap: clamp(4rem, 12vh, 10.5rem);
+  width: 100%;
   transform: translateY(-4vh);
 }
 
@@ -117,12 +111,73 @@ function selectDifficulty(difficulty: Difficulty): void {
   text-shadow: 0 6px 18px rgb(0 0 0 / 50%);
 }
 
-.difficulty-options {
+.menu {
   display: flex;
   flex-direction: column;
+  gap: 1.25rem;
+  width: min(100%, 340px);
+}
+
+.difficulty-selector {
+  display: flex;
+  padding: 4px;
+  gap: 4px;
+  background: rgb(10 15 29 / 55%);
+  border: 2px solid #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 25%);
+}
+
+.difficulty-option {
+  position: relative;
+  flex: 1 1 0;
+  display: flex;
+  cursor: pointer;
+}
+
+.difficulty-input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.difficulty-label {
+  display: flex;
   align-items: center;
-  gap: 1rem;
+  justify-content: center;
   width: 100%;
+  min-height: 44px;
+  padding: 0 0.5rem;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.difficulty-option:hover .difficulty-label {
+  color: var(--text-main);
+}
+
+.difficulty-input:checked + .difficulty-label {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.difficulty-input:focus-visible + .difficulty-label {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .menu-button {
@@ -154,17 +209,6 @@ function selectDifficulty(difficulty: Difficulty): void {
   filter: brightness(0.95);
   transform: scale(0.98);
   box-shadow: 0 4px 12px rgb(0 0 0 / 20%);
-}
-
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-  transform: scale(0.95);
 }
 </style>
 
