@@ -1,5 +1,6 @@
 import {ref} from 'vue'
-import {MEME_CATALOGUE_URL} from '@/constants'
+import {MATCH_LENGTH_MEME_COUNTS, MEME_CATALOGUE_URL} from '@/constants'
+import type {MatchLength} from '@/types/match_length'
 import type {Meme} from '@/types/meme'
 
 /**
@@ -49,6 +50,15 @@ export async function fetchMemeCatalogue(): Promise<Meme[]> {
     isCatalogueLoading.value = false
     return []
   }
+}
+
+/**
+ * Resolves how many memes a match of the given length plays, capped at the catalogue size.
+ * @param matchLength - The match length.
+ * @returns The number of memes played in the match.
+ */
+export function getMatchMemeCount(matchLength: MatchLength): number {
+  return Math.min(MATCH_LENGTH_MEME_COUNTS[matchLength], memeCatalogue.value.length)
 }
 
 /**

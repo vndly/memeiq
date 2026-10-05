@@ -3,6 +3,7 @@ import type {Analytics} from 'firebase/analytics'
 import type {FirebaseApp} from 'firebase/app'
 import {app} from '@/firebase'
 import type {Difficulty} from '@/types/difficulty'
+import type {MatchLength} from '@/types/match_length'
 
 /**
  * Parameters for tracking an audio playback event.
@@ -76,15 +77,19 @@ export class AnalyticsService {
   /**
    * Tracks when a player starts a new match.
    * @param difficulty - Selected match difficulty.
+   * @param matchLength - Selected match length.
    */
-  trackMatchStart(difficulty?: Difficulty): void {
+  trackMatchStart(difficulty?: Difficulty, matchLength?: MatchLength): void {
+    const payload: Record<string, string | number | boolean> = {}
+
     if (difficulty !== undefined) {
-      this.log('match_start', {
-        difficulty: difficulty,
-      })
-      return
+      payload.difficulty = difficulty
     }
-    this.log('match_start')
+    if (matchLength !== undefined) {
+      payload.match_length = matchLength
+    }
+
+    this.log('match_start', payload)
   }
 
   /**

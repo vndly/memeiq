@@ -1,5 +1,6 @@
 import memesCatalogueUrl from '@/assets/memes.json?url&no-inline'
 import type {Difficulty} from '@/types/difficulty'
+import type {MatchLength} from '@/types/match_length'
 
 /**
  * Application constants.
@@ -21,3 +22,12 @@ export const DIFFICULTY_CARD_COUNTS: Record<Difficulty, number> = {
   hard: 6,
 }
 
+/** Default match length when none is specified. */
+export const DEFAULT_MATCH_LENGTH: MatchLength = 'full'
+
+/** Number of memes played for each match length; the full length plays the whole catalogue. */
+export const MATCH_LENGTH_MEME_COUNTS: Record<MatchLength, number> = {
+  small: 10,
+  medium: 20,
+  full: Infinity,
+}

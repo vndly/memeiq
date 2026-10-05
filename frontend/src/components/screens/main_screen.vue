@@ -1,16 +1,24 @@
 <script setup lang="ts">
-import {ref} from 'vue'
+import {computed, ref} from 'vue'
 import {useRouter} from 'vue-router'
 import {analytics} from '@/services/analytics'
+import {getMatchMemeCount} from '@/services/meme_catalogue'
 import type {Difficulty} from '@/types/difficulty'
+import type {MatchLength} from '@/types/match_length'
 
 interface DifficultyOption {
   difficulty: Difficulty
   label: string
 }
 
+interface MatchLengthOption {
+  matchLength: MatchLength
+  memeCount: number
+}
+
 const router = useRouter()
 const selectedDifficulty = ref<Difficulty>('medium')
+const selectedMatchLength = ref<MatchLength>('medium')
 
 const DIFFICULTY_OPTIONS: readonly DifficultyOption[] = [
   {
@@ -27,15 +35,29 @@ const DIFFICULTY_OPTIONS: readonly DifficultyOption[] = [
   },
 ]
 
+const MATCH_LENGTHS: readonly MatchLength[] = [
+  'small',
+  'medium',
+  'full',
+]
+
+const matchLengthOptions = computed<MatchLengthOption[]>(() => {
+  return MATCH_LENGTHS.map((matchLength) => ({
+    matchLength: matchLength,
+    memeCount: getMatchMemeCount(matchLength),
+  }))
+})
+
 /**
- * Navigates to the match screen with the selected difficulty.
+ * Navigates to the match screen with the selected difficulty and match length.
  */
 function handleStartClick(): void {
-  analytics.trackMatchStart(selectedDifficulty.value)
+  analytics.trackMatchStart(selectedDifficulty.value, selectedMatchLength.value)
   void router.push({
     name: 'match',
     query: {
       difficulty: selectedDifficulty.value,
+      length: selectedMatchLength.value,
     },
   })
 }
@@ -48,23 +70,50 @@ function handleStartClick(): void {
         Meme IQ
       </h1>
       <div class="menu">
-        <fieldset class="difficulty-selector">
+        <div class="selector-group">
+          <p
+            class="selector-caption"
+            aria-hidden="true"
+          >
+            MEMES
+          </p>
+          <fieldset class="option-selector">
+            <legend class="visually-hidden">
+              Number of memes
+            </legend>
+            <label
+              v-for="option in matchLengthOptions"
+              :key="option.matchLength"
+              class="option"
+            >
+              <input
+                v-model="selectedMatchLength"
+                type="radio"
+                name="match-length"
+                class="option-input"
+                :value="option.matchLength"
+              >
+              <span class="option-label option-label--count">{{ option.memeCount }}</span>
+            </label>
+          </fieldset>
+        </div>
+        <fieldset class="option-selector">
           <legend class="visually-hidden">
             Difficulty
           </legend>
           <label
             v-for="option in DIFFICULTY_OPTIONS"
             :key="option.difficulty"
-            class="difficulty-option"
+            class="option"
           >
             <input
               v-model="selectedDifficulty"
               type="radio"
               name="difficulty"
-              class="difficulty-input"
+              class="option-input"
               :value="option.difficulty"
             >
-            <span class="difficulty-label">{{ option.label }}</span>
+            <span class="option-label">{{ option.label }}</span>
           </label>
         </fieldset>
         <button
@@ -118,7 +167,23 @@ function handleStartClick(): void {
   width: min(100%, 340px);
 }
 
-.difficulty-selector {
+.selector-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.selector-caption {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--text-main);
+  text-align: center;
+  text-shadow: 0 2px 8px rgb(0 0 0 / 70%);
+}
+
+.option-selector {
   display: flex;
   padding: 4px;
   gap: 4px;
@@ -128,20 +193,20 @@ function handleStartClick(): void {
   box-shadow: 0 6px 20px rgb(0 0 0 / 25%);
 }
 
-.difficulty-option {
+.option {
   position: relative;
   flex: 1 1 0;
   display: flex;
   cursor: pointer;
 }
 
-.difficulty-input {
+.option-input {
   position: absolute;
   opacity: 0;
   pointer-events: none;
 }
 
-.difficulty-label {
+.option-label {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -157,16 +222,21 @@ function handleStartClick(): void {
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.difficulty-option:hover .difficulty-label {
+.option:hover .option-label {
   color: var(--text-main);
 }
 
-.difficulty-input:checked + .difficulty-label {
+.option-input:checked + .option-label {
   background: var(--accent);
   color: var(--accent-contrast);
 }
 
-.difficulty-input:focus-visible + .difficulty-label {
+.option-label--count {
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.option-input:focus-visible + .option-label {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -182,6 +252,7 @@ function handleStartClick(): void {
 
 .menu-button {
   display: inline-flex;
+  margin-top: 3rem;
   align-items: center;
   justify-content: center;
   min-width: 180px;

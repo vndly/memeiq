@@ -7,14 +7,16 @@ import winAudioUrl from '@/assets/win.mp3'
 import ConfirmDialog from '@/components/confirm_dialog.vue'
 import LoadingSpinner from '@/components/loading_spinner.vue'
 import PauseDialog from '@/components/pause_dialog.vue'
-import {DEFAULT_DIFFICULTY, DIFFICULTY_CARD_COUNTS, THUMBNAIL_RATIO} from '@/constants'
+import {DEFAULT_DIFFICULTY, DEFAULT_MATCH_LENGTH, DIFFICULTY_CARD_COUNTS, THUMBNAIL_RATIO} from '@/constants'
 import {analytics} from '@/services/analytics'
-import {memeCatalogue, pickStageMemes, shuffleMemes} from '@/services/meme_catalogue'
+import {getMatchMemeCount, memeCatalogue, pickStageMemes, shuffleMemes} from '@/services/meme_catalogue'
 import {loadThumbnail} from '@/services/thumbnail_loader'
 import {extractYouTubeVideoId, getYouTubeThumbnailUrl} from '@/services/youtube'
 import {YouTubeAudioPlayer} from '@/services/youtube_player'
 import {isDifficulty} from '@/types/difficulty'
 import type {Difficulty} from '@/types/difficulty'
+import {isMatchLength} from '@/types/match_length'
+import type {MatchLength} from '@/types/match_length'
 import type {Meme} from '@/types/meme'
 
 const router = useRouter()
@@ -30,6 +32,14 @@ const difficulty = computed<Difficulty>(() => {
     return queryDifficulty
   }
   return DEFAULT_DIFFICULTY
+})
+
+const matchLength = computed<MatchLength>(() => {
+  const queryMatchLength = route.query.length
+  if (typeof queryMatchLength === 'string' && isMatchLength(queryMatchLength)) {
+    return queryMatchLength
+  }
+  return DEFAULT_MATCH_LENGTH
 })
 
 const cardCount = computed<number>(() => {
@@ -86,13 +96,13 @@ const isDialogOpen = computed(() => {
 })
 
 /**
- * Starts a new match with one stage per catalogue meme, in random order.
+ * Starts a new match with one stage per randomly picked catalogue meme, as many as the match length allows.
  */
 function startMatch(): void {
   if (memeCatalogue.value.length === 0) {
     return
   }
-  stageTargetMemes.value = shuffleMemes(memeCatalogue.value)
+  stageTargetMemes.value = shuffleMemes(memeCatalogue.value).slice(0, getMatchMemeCount(matchLength.value))
   stageIndex.value = 0
   correctAnswerCount.value = 0
   isMatchComplete.value = false
@@ -477,7 +487,10 @@ onUnmounted(() => {
 })
 
 watch(
-  () => difficulty.value,
+  [
+    difficulty,
+    matchLength,
+  ],
   () => {
     haltPlayback()
     startMatch()
