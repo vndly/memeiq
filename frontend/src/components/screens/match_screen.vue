@@ -530,9 +530,6 @@ watch(
       <p class="results-score">
         {{ correctAnswerCount }}/{{ stageCount }}
       </p>
-      <p class="results-caption">
-        memes guessed right
-      </p>
       <button
         type="button"
         class="action-button"
@@ -756,14 +753,6 @@ watch(
   -webkit-text-stroke: 4px #000000;
   paint-order: stroke fill;
   text-shadow: 0 8px 24px rgb(0 0 0 / 50%);
-}
-
-.results-caption {
-  font-family: var(--font-ui);
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: var(--text-main);
-  text-shadow: 0 2px 8px rgb(0 0 0 / 60%);
 }
 
 .results .action-button {
