@@ -101,8 +101,8 @@ onUnmounted(() => {
   justify-content: center;
   padding: 1.5rem;
   background: rgb(0 0 0 / 65%);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
 }
 
 .dialog-container {

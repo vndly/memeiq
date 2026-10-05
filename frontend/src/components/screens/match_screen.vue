@@ -59,6 +59,7 @@ let audioPlayer: YouTubeAudioPlayer | null = null
 let resetTimeoutId: ReturnType<typeof setTimeout> | null = null
 let autoplayCheckTimeoutId: ReturnType<typeof setTimeout> | null = null
 let resolveAudioLoad: (() => void) | null = null
+let isAudioPausedByDialog = false
 let stageLoadGeneration = 0
 
 const RESET_ROUND_DELAY_MS = 1000
@@ -364,10 +365,13 @@ function haltPlayback(): void {
 }
 
 /**
- * Halts the match and opens the pause dialog.
+ * Halts the match and opens the pause dialog, pausing the meme audio so it can be resumed where it left off.
  */
 function pauseMatch(): void {
-  haltPlayback()
+  isAudioPausedByDialog = audioPlayer?.playing ?? false
+  audioPlayer?.pause()
+  stopSoundEffects()
+  clearResetTimeout()
   isPauseOpen.value = true
   analytics.trackPauseDialogShown()
 }
@@ -383,12 +387,14 @@ function handlePauseClick(): void {
 }
 
 /**
- * Closes the pause dialog and resumes the halted stage: advances if a card was already picked, otherwise restarts the meme audio.
+ * Closes the pause dialog and resumes the halted stage: advances if a card was already picked, resumes the meme audio if it was paused, or starts it if it never played.
  */
 function handleResume(): void {
   analytics.trackMatchResume()
   isPauseOpen.value = false
   targetRoute.value = null
+  const wasAudioPaused = isAudioPausedByDialog
+  isAudioPausedByDialog = false
   if (isStageLoading.value || isMatchComplete.value) {
     return
   }
@@ -396,7 +402,11 @@ function handleResume(): void {
     scheduleStageAdvance()
     return
   }
-  autoplayAudio()
+  if (wasAudioPaused) {
+    audioPlayer?.resume()
+  } else if (!hasAudioPlayed.value) {
+    autoplayAudio()
+  }
 }
 
 /**

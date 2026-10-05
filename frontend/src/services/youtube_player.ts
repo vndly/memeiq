@@ -97,6 +97,7 @@ export class YouTubeAudioPlayer {
   private player: YouTubePlayer | null = null
   private isPlayerReady: boolean = false
   private pendingPlay: boolean = false
+  private isPlaybackActive: boolean = false
   private callbacks: YouTubeAudioPlayerCallbacks
   private hostElement: HTMLElement | null = null
   private mountGeneration: number = 0
@@ -110,6 +111,7 @@ export class YouTubeAudioPlayer {
     this.player = null // Active YouTube player instance
     this.isPlayerReady = false // Whether player is ready for playback
     this.pendingPlay = false // Whether playback was queued before ready
+    this.isPlaybackActive = false // Whether playback was requested and has not been paused, stopped, or ended
     this.hostElement = null // Host container element
     this.mountGeneration = 0 // Generation counter to guard async mount
   }
@@ -119,6 +121,13 @@ export class YouTubeAudioPlayer {
    */
   get ready(): boolean {
     return this.isPlayerReady
+  }
+
+  /**
+   * Indicates whether the audio is playing, or was asked to play and has not been paused, stopped, or ended.
+   */
+  get playing(): boolean {
+    return this.isPlaybackActive
   }
 
   /**
@@ -194,6 +203,7 @@ export class YouTubeAudioPlayer {
    * Plays the audio from the beginning.
    */
   play(): void {
+    this.isPlaybackActive = true
     if (this.player !== null && this.isPlayerReady) {
       this.player.seekTo(0, true)
       this.player.playVideo()
@@ -203,10 +213,32 @@ export class YouTubeAudioPlayer {
   }
 
   /**
+   * Pauses the audio, keeping its position so it can be resumed.
+   */
+  pause(): void {
+    this.pendingPlay = false
+    this.isPlaybackActive = false
+    if (this.player !== null && this.isPlayerReady) {
+      this.player.pauseVideo()
+    }
+  }
+
+  /**
+   * Continues the audio from the position where it was paused.
+   */
+  resume(): void {
+    if (this.player !== null && this.isPlayerReady) {
+      this.isPlaybackActive = true
+      this.player.playVideo()
+    }
+  }
+
+  /**
    * Stops the audio playback.
    */
   stop(): void {
     this.pendingPlay = false
+    this.isPlaybackActive = false
     if (this.player !== null && this.isPlayerReady) {
       this.player.stopVideo()
     }
@@ -218,6 +250,7 @@ export class YouTubeAudioPlayer {
   destroy(): void {
     this.mountGeneration++
     this.pendingPlay = false
+    this.isPlaybackActive = false
     this.isPlayerReady = false
     if (this.player !== null) {
       try {
@@ -259,6 +292,7 @@ export class YouTubeAudioPlayer {
     }
     // 0 represents ENDED in YouTube PlayerState
     if (event.data === 0) {
+      this.isPlaybackActive = false
       this.callbacks.onEnded()
     }
   }
@@ -269,6 +303,7 @@ export class YouTubeAudioPlayer {
    */
   private handleError(_event: YouTubePlayerErrorEvent): void {
     this.pendingPlay = false
+    this.isPlaybackActive = false
     this.callbacks.onError()
   }
 }
