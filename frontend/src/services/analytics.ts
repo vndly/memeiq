@@ -88,6 +88,20 @@ export class AnalyticsService {
   }
 
   /**
+   * Tracks when the pause dialog is displayed.
+   */
+  trackPauseDialogShown(): void {
+    this.log('pause_dialog_shown')
+  }
+
+  /**
+   * Tracks when the player closes the pause dialog and resumes the match.
+   */
+  trackMatchResume(): void {
+    this.log('match_resume')
+  }
+
+  /**
    * Tracks when the confirmation dialog to leave a match is displayed.
    */
   trackLeaveDialogShown(): void {

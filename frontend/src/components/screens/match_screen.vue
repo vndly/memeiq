@@ -6,6 +6,7 @@ import failAudioUrl from '@/assets/fail.mp3'
 import winAudioUrl from '@/assets/win.mp3'
 import ConfirmDialog from '@/components/confirm_dialog.vue'
 import LoadingSpinner from '@/components/loading_spinner.vue'
+import PauseDialog from '@/components/pause_dialog.vue'
 import {DEFAULT_DIFFICULTY, DIFFICULTY_CARD_COUNTS, THUMBNAIL_RATIO} from '@/constants'
 import {analytics} from '@/services/analytics'
 import {memeCatalogue, pickStageMemes, shuffleMemes} from '@/services/meme_catalogue'
@@ -18,6 +19,7 @@ import type {Meme} from '@/types/meme'
 
 const router = useRouter()
 const route = useRoute()
+const isPauseOpen = ref(false)
 const isConfirmOpen = ref(false)
 const isNavigationConfirmed = ref(false)
 const targetRoute = ref<RouteLocationRaw | null>(null)
@@ -76,6 +78,10 @@ const isCardDisabled = computed(() => {
 
 const isPlayButtonDisabled = computed(() => {
   return isPlayButtonPressed.value || clickedMemeId.value !== null || !isPlayerReady.value
+})
+
+const isDialogOpen = computed(() => {
+  return isPauseOpen.value || isConfirmOpen.value
 })
 
 /**
@@ -259,6 +265,14 @@ function handleCardClick(meme: Meme): void {
     result: isCorrect ? 'success' : 'failure',
   })
 
+  scheduleStageAdvance()
+}
+
+/**
+ * Moves to the next stage once the selection feedback has been shown.
+ */
+function scheduleStageAdvance(): void {
+  clearResetTimeout()
   resetTimeoutId = setTimeout(() => {
     resetTimeoutId = null
     advanceStage()
@@ -315,7 +329,7 @@ function autoplayAudio(): void {
     }
   }, AUTOPLAY_CHECK_DELAY_MS)
 
-  if (isConfirmOpen.value || !isPlayerReady.value || audioPlayer === null) {
+  if (isDialogOpen.value || !isPlayerReady.value || audioPlayer === null) {
     return
   }
 
@@ -350,6 +364,51 @@ function haltPlayback(): void {
 }
 
 /**
+ * Halts the match and opens the pause dialog.
+ */
+function pauseMatch(): void {
+  haltPlayback()
+  isPauseOpen.value = true
+  analytics.trackPauseDialogShown()
+}
+
+/**
+ * Pauses the match from the pause button.
+ */
+function handlePauseClick(): void {
+  if (isDialogOpen.value) {
+    return
+  }
+  pauseMatch()
+}
+
+/**
+ * Closes the pause dialog and resumes the halted stage: advances if a card was already picked, otherwise restarts the meme audio.
+ */
+function handleResume(): void {
+  analytics.trackMatchResume()
+  isPauseOpen.value = false
+  targetRoute.value = null
+  if (isStageLoading.value || isMatchComplete.value) {
+    return
+  }
+  if (clickedMemeId.value !== null) {
+    scheduleStageAdvance()
+    return
+  }
+  autoplayAudio()
+}
+
+/**
+ * Swaps the pause dialog for the confirmation to leave the match.
+ */
+function handleQuit(): void {
+  isPauseOpen.value = false
+  isConfirmOpen.value = true
+  analytics.trackLeaveDialogShown()
+}
+
+/**
  * Confirms navigation away from the match screen.
  */
 function handleConfirmLeave(): void {
@@ -363,16 +422,12 @@ function handleConfirmLeave(): void {
 }
 
 /**
- * Cancels navigation away from the match screen.
+ * Cancels navigation away from the match screen and returns to the pause dialog.
  */
 function handleCancelLeave(): void {
   analytics.trackMatchStay()
   isConfirmOpen.value = false
-  targetRoute.value = null
-  // Restart the audio that was cut off when the dialog opened
-  if (!isStageLoading.value && !isMatchComplete.value && clickedMemeId.value === null && hasAudioPlayed.value) {
-    audioPlayer?.play()
-  }
+  isPauseOpen.value = true
 }
 
 /**
@@ -389,10 +444,10 @@ onBeforeRouteLeave((to) => {
     return true
   }
 
-  haltPlayback()
   targetRoute.value = to
-  isConfirmOpen.value = true
-  analytics.trackLeaveDialogShown()
+  if (!isDialogOpen.value) {
+    pauseMatch()
+  }
   return false
 })
 
@@ -548,7 +603,30 @@ watch(
           PLAY
         </button>
       </template>
+
+      <button
+        type="button"
+        class="pause-button"
+        aria-label="Pause"
+        @click="handlePauseClick"
+      >
+        <svg
+          class="pause-icon"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          aria-hidden="true"
+        >
+          <rect x="6" y="5" width="4" height="14" rx="1" />
+          <rect x="14" y="5" width="4" height="14" rx="1" />
+        </svg>
+      </button>
     </template>
+
+    <PauseDialog
+      :is-open="isPauseOpen"
+      @resume="handleResume"
+      @quit="handleQuit"
+    />
 
     <ConfirmDialog
       :is-open="isConfirmOpen"
@@ -835,6 +913,41 @@ watch(
   visibility: hidden;
 }
 
+.pause-button {
+  position: absolute;
+  top: var(--safe-top);
+  right: var(--safe-right);
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: var(--button-height);
+  height: var(--button-height);
+  padding: 0;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border: 2px solid #ffffff;
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 25%);
+  transition: filter 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+.pause-button:hover {
+  filter: brightness(1.08);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
+}
+
+.pause-button:active {
+  filter: brightness(0.95);
+  transform: scale(0.98);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 20%);
+}
+
+.pause-icon {
+  width: 22px;
+  height: 22px;
+}
+
 .audio-player-host {
   position: fixed;
   top: -9999px;
@@ -902,6 +1015,12 @@ watch(
 
   .play-button {
     align-self: start;
+  }
+
+  .pause-button {
+    --button-height: 48px;
+    top: 1.5rem;
+    right: var(--card-gap);
   }
 }
 
