@@ -150,62 +150,64 @@ function handleStartClick(): void {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: clamp(4rem, 12vh, 10.5rem);
+  gap: clamp(3rem, 9vh, 7rem);
   width: 100%;
   transform: translateY(-4vh);
 }
 
 .title {
   font-family: var(--font-display);
-  font-size: clamp(3.5rem, 9vw, 5.25rem);
-  letter-spacing: 0.06em;
+  font-size: clamp(4.5rem, 18vw, 7.5rem);
+  font-weight: 400;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
   color: var(--text-main);
   text-align: center;
-  line-height: 1.05;
-  -webkit-text-stroke: 2.5px #000000;
+  line-height: 1;
+  -webkit-text-stroke: 8px var(--ink);
   paint-order: stroke fill;
-  text-shadow: 0 6px 18px rgb(0 0 0 / 50%);
+  text-shadow: 0 6px 0 var(--ink);
+  transform: rotate(-3deg);
 }
 
 .menu {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
-  width: min(100%, 340px);
+  width: min(100%, 360px);
 }
 
 .selector-group {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.625rem;
 }
 
 .selector-group + .selector-group {
-  margin-top: 0.75rem;
+  margin-top: 0.5rem;
 }
 
 .selector-caption {
   font-family: var(--font-display);
   font-size: 1.625rem;
   line-height: 1;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--text-main);
   text-align: center;
-  -webkit-text-stroke: 1.5px #000000;
+  -webkit-text-stroke: 5px var(--ink);
   paint-order: stroke fill;
-  text-shadow: 0 4px 12px rgb(0 0 0 / 50%);
+  text-shadow: 0 3px 0 var(--ink);
 }
 
 .option-selector {
   display: flex;
-  padding: 4px;
-  gap: 4px;
-  background: rgb(10 15 29 / 55%);
-  border: 2px solid #ffffff;
-  border-radius: 8px;
-  box-shadow: 0 6px 20px rgb(0 0 0 / 25%);
+  padding: 5px;
+  gap: 5px;
+  background: var(--paper);
+  border: 3px solid var(--ink);
+  border-radius: 14px;
+  box-shadow: 0 5px 0 var(--ink);
 }
 
 .option {
@@ -228,32 +230,32 @@ function handleStartClick(): void {
   width: 100%;
   min-height: 44px;
   padding: 0 0.5rem;
-  border-radius: 4px;
-  font-family: var(--font-mono);
-  font-size: 0.875rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  color: var(--text-dim);
+  border-radius: 9px;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  color: var(--ink);
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 .option:hover .option-label {
-  color: var(--text-main);
+  background: rgb(0 0 0 / 8%);
 }
 
 .option-input:checked + .option-label {
-  background: var(--accent);
-  color: var(--accent-contrast);
+  background: var(--ink);
+  color: var(--paper);
 }
 
 .option-label--count {
-  font-size: 1rem;
+  font-size: 1.5rem;
   font-variant-numeric: tabular-nums;
 }
 
 .option-input:focus-visible + .option-label {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
 }
 
 .visually-hidden {
@@ -267,34 +269,32 @@ function handleStartClick(): void {
 
 .menu-button {
   display: inline-flex;
-  margin-top: 3rem;
+  margin-top: 2.5rem;
   align-items: center;
   justify-content: center;
   min-width: 180px;
-  min-height: 48px;
-  padding: 0.75rem 2.5rem;
+  min-height: 60px;
+  padding: 0.5rem 2.5rem;
   background: var(--accent);
-  color: var(--accent-contrast);
-  border: 2px solid #ffffff;
-  border-radius: 6px;
-  font-family: var(--font-mono);
-  font-size: 1rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
+  color: var(--ink);
+  border: 3px solid var(--ink);
+  border-radius: 14px;
+  font-family: var(--font-display);
+  font-size: 2rem;
+  line-height: 1;
+  letter-spacing: 0.05em;
   cursor: pointer;
-  box-shadow: 0 6px 20px rgb(0 0 0 / 25%);
-  transition: filter 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+  box-shadow: 0 6px 0 var(--ink);
+  transition: filter 0.15s ease, transform 0.08s ease, box-shadow 0.08s ease;
 }
 
 .menu-button:hover {
-  filter: brightness(1.08);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
+  filter: brightness(1.06);
 }
 
 .menu-button:active {
-  filter: brightness(0.95);
-  transform: scale(0.98);
-  box-shadow: 0 4px 12px rgb(0 0 0 / 20%);
+  transform: translateY(5px);
+  box-shadow: 0 1px 0 var(--ink);
 }
 </style>
 

@@ -58,58 +58,62 @@ function retryFetch(): void {
 
 .loading-text {
   font-family: var(--font-display);
-  font-size: clamp(2.5rem, 7vw, 3.5rem);
-  letter-spacing: 0.06em;
+  font-size: clamp(2.75rem, 10vw, 3.75rem);
+  letter-spacing: 0.03em;
   text-transform: uppercase;
   color: var(--text-main);
   text-align: center;
-  line-height: 1.05;
-  -webkit-text-stroke: 2.5px #000000;
+  line-height: 1;
+  -webkit-text-stroke: 7px var(--ink);
   paint-order: stroke fill;
-  text-shadow: 0 6px 18px rgb(0 0 0 / 50%);
+  text-shadow: 0 5px 0 var(--ink);
 }
 
 .error-content {
-  text-align: center;
+  gap: 1.5rem;
   max-width: 360px;
+  padding: 1.75rem 1.5rem 2rem;
+  text-align: center;
+  background: var(--paper);
+  border: 3px solid var(--ink);
+  border-radius: 20px;
+  box-shadow: 0 8px 0 var(--ink);
 }
 
 .error-text {
-  font-family: var(--font-mono);
-  font-size: 0.95rem;
-  line-height: 1.4;
-  color: var(--text-main);
-  text-shadow: 0 2px 8px rgb(0 0 0 / 50%);
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--ink);
 }
 
 .retry-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 140px;
-  min-height: 44px;
-  padding: 0.6rem 2rem;
+  min-width: 160px;
+  min-height: 52px;
+  padding: 0.5rem 2rem;
   background: var(--accent);
-  color: var(--accent-contrast);
-  border: 2px solid #ffffff;
-  border-radius: 6px;
-  font-family: var(--font-mono);
-  font-size: 0.95rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
+  color: var(--ink);
+  border: 3px solid var(--ink);
+  border-radius: 12px;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  line-height: 1;
+  letter-spacing: 0.05em;
   cursor: pointer;
-  box-shadow: 0 6px 20px rgb(0 0 0 / 25%);
-  transition: filter 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+  box-shadow: 0 5px 0 var(--ink);
+  transition: filter 0.15s ease, transform 0.08s ease, box-shadow 0.08s ease;
 }
 
 .retry-button:hover {
-  filter: brightness(1.08);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
+  filter: brightness(1.06);
 }
 
 .retry-button:active {
-  filter: brightness(0.95);
-  transform: scale(0.98);
-  box-shadow: 0 4px 12px rgb(0 0 0 / 20%);
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 var(--ink);
 }
 </style>

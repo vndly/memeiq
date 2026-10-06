@@ -62,6 +62,7 @@ const clickedMemeId = ref<number | null>(null)
 const hasAudioPlayed = ref(false)
 const isPlayButtonVisible = ref(false)
 const isPlayButtonPressed = ref(false)
+const displayedIqScore = ref(0)
 
 const winAudio = typeof Audio !== 'undefined' ? new Audio(winAudioUrl) : null
 const failAudio = typeof Audio !== 'undefined' ? new Audio(failAudioUrl) : null
@@ -75,9 +76,11 @@ let stageLoadGeneration = 0
 let isStageClockStarted = false
 let stageClockRunningSince: number | null = null
 let stageClockElapsedMs = 0
+let iqCountUpFrameId: number | null = null
 
 const RESET_ROUND_DELAY_MS = 1000
 const AUTOPLAY_CHECK_DELAY_MS = 2000
+const IQ_COUNT_UP_DURATION_MS = 1200
 
 const stageCount = computed(() => {
   return stageTargetMemes.value.length
@@ -103,6 +106,10 @@ const roundedIqScore = computed(() => {
   return Math.round(iqScore.value)
 })
 
+const iqScoreMinWidth = computed(() => {
+  return `${String(roundedIqScore.value).length}ch`
+})
+
 /**
  * Starts a new match with one stage per randomly picked catalogue meme, as many as the match length allows.
  */
@@ -115,6 +122,7 @@ function startMatch(): void {
   correctAnswerCount.value = 0
   iqScore.value = 0
   isMatchComplete.value = false
+  cancelIqCountUp()
   void loadStage()
 }
 
@@ -178,10 +186,43 @@ function advanceStage(): void {
     stopSoundEffects()
     audioPlayer?.destroy()
     isMatchComplete.value = true
+    startIqCountUp()
     return
   }
   stageIndex.value++
   void loadStage()
+}
+
+/**
+ * Counts the displayed IQ up from zero to the final score, or shows the final score at once when reduced motion is preferred.
+ */
+function startIqCountUp(): void {
+  cancelIqCountUp()
+  const finalScore = roundedIqScore.value
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    displayedIqScore.value = finalScore
+    return
+  }
+
+  const startTime = performance.now()
+  const renderCountUpFrame = (timestamp: number): void => {
+    const progress = Math.min(1, (timestamp - startTime) / IQ_COUNT_UP_DURATION_MS)
+    const easedProgress = 1 - (1 - progress) ** 3
+    displayedIqScore.value = Math.round(finalScore * easedProgress)
+    iqCountUpFrameId = progress < 1 ? requestAnimationFrame(renderCountUpFrame) : null
+  }
+  displayedIqScore.value = 0
+  iqCountUpFrameId = requestAnimationFrame(renderCountUpFrame)
+}
+
+/**
+ * Stops the IQ count-up, if running.
+ */
+function cancelIqCountUp(): void {
+  if (iqCountUpFrameId !== null) {
+    cancelAnimationFrame(iqCountUpFrameId)
+    iqCountUpFrameId = null
+  }
 }
 
 /**
@@ -558,6 +599,7 @@ onUnmounted(() => {
   stageLoadGeneration++
   clearResetTimeout()
   clearAutoplayCheckTimeout()
+  cancelIqCountUp()
   if (audioPlayer !== null) {
     audioPlayer.destroy()
     audioPlayer = null
@@ -608,7 +650,11 @@ watch(
       </h2>
       <p class="results-iq">
         <span class="results-iq-unit">IQ</span>
-        <span class="results-iq-value">{{ roundedIqScore }}</span>
+        <span
+          class="results-iq-value"
+          aria-hidden="true"
+        >{{ displayedIqScore }}</span>
+        <span class="visually-hidden">{{ roundedIqScore }}</span>
       </p>
       <p class="results-correct">
         {{ correctAnswerCount }}/{{ stageCount }} correct
@@ -670,7 +716,7 @@ watch(
               <svg
                 v-if="meme.id === activeMeme?.id"
                 class="feedback-icon is-correct"
-                viewBox="0 0 24 24"
+                viewBox="-5 -5 34 34"
                 fill="none"
                 stroke="currentColor"
                 stroke-width="3.5"
@@ -682,7 +728,7 @@ watch(
               <svg
                 v-else
                 class="feedback-icon is-incorrect"
-                viewBox="0 0 24 24"
+                viewBox="-5 -5 34 34"
                 fill="none"
                 stroke="currentColor"
                 stroke-width="3.5"
@@ -703,6 +749,14 @@ watch(
           :disabled="isPlayButtonDisabled"
           @click="handlePlayClick"
         >
+          <svg
+            class="play-icon"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <path d="M6 3.5v17a1 1 0 0 0 1.5.86l14-8.5a1 1 0 0 0 0-1.72l-14-8.5A1 1 0 0 0 6 3.5Z" />
+          </svg>
           PLAY
         </button>
       </template>
@@ -765,7 +819,9 @@ watch(
   padding-bottom: var(--safe-bottom);
   padding-left: var(--safe-left);
   overflow: hidden;
-  background: var(--ground) url('@/assets/background.jpg') center / cover no-repeat;
+  background:
+    linear-gradient(color-mix(in srgb, var(--ground) 55%, transparent), color-mix(in srgb, var(--ground) 55%, transparent)),
+    var(--ground) url('@/assets/background.jpg') center / cover no-repeat;
 }
 
 .visually-hidden {
@@ -783,15 +839,18 @@ watch(
 .stage-counter {
   grid-row: 1;
   align-self: start;
+  display: flex;
+  align-items: center;
+  min-height: var(--button-height);
   font-family: var(--font-display);
   font-size: var(--counter-size);
   line-height: 1;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   color: var(--text-main);
   font-variant-numeric: tabular-nums;
-  -webkit-text-stroke: 1.5px #000000;
+  -webkit-text-stroke: 5px var(--ink);
   paint-order: stroke fill;
-  text-shadow: 0 4px 12px rgb(0 0 0 / 50%);
+  text-shadow: 0 3px 0 var(--ink);
 }
 
 .stage-loading {
@@ -809,58 +868,60 @@ watch(
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2rem;
+  gap: clamp(1rem, 5dvh, 2.5rem);
   text-align: center;
 }
 
 .results-title {
   font-family: var(--font-display);
-  font-size: clamp(2.25rem, 7vw, 3.25rem);
+  font-size: clamp(2.25rem, min(9vw, 8dvh), 3.75rem);
   font-weight: 400;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
   color: var(--text-main);
-  line-height: 1.05;
-  -webkit-text-stroke: 2.5px #000000;
+  line-height: 1;
+  -webkit-text-stroke: 7px var(--ink);
   paint-order: stroke fill;
-  text-shadow: 0 6px 18px rgb(0 0 0 / 50%);
+  text-shadow: 0 5px 0 var(--ink);
 }
 
 .results-iq {
   display: flex;
   align-items: baseline;
-  gap: 0.15em;
+  gap: 0.12em;
+  padding: 0.12em 0.3em 0.1em;
   font-family: var(--font-display);
-  font-size: clamp(3.5rem, 14vw, 6.5rem);
+  font-size: clamp(3.5rem, min(24vw, 20dvh), 9rem);
   line-height: 1;
   letter-spacing: 0.02em;
-  paint-order: stroke fill;
-  text-shadow: 0 8px 24px rgb(0 0 0 / 50%);
+  color: var(--ink);
+  background: var(--accent);
+  border: 4px solid var(--ink);
+  border-radius: 20px;
+  box-shadow: 0 8px 0 var(--ink);
+  transform: rotate(-4deg);
 }
 
 .results-iq-unit {
-  color: var(--text-main);
-  -webkit-text-stroke: 3px #000000;
-  paint-order: stroke fill;
+  font-size: 0.4em;
 }
 
 .results-iq-value {
-  color: var(--accent);
+  min-width: v-bind(iqScoreMinWidth);
+  letter-spacing: 0;
   font-variant-numeric: tabular-nums;
-  -webkit-text-stroke: 3px #000000;
-  paint-order: stroke fill;
 }
 
 .results-correct {
   font-family: var(--font-display);
   font-size: var(--counter-size);
   line-height: 1;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   color: var(--text-main);
   font-variant-numeric: tabular-nums;
-  -webkit-text-stroke: 1.5px #000000;
+  -webkit-text-stroke: 5px var(--ink);
   paint-order: stroke fill;
-  text-shadow: 0 4px 12px rgb(0 0 0 / 50%);
+  text-shadow: 0 3px 0 var(--ink);
 }
 
 .results .action-button {
@@ -868,7 +929,7 @@ watch(
 }
 
 .thumbnails {
-  --mobile-card-gap: 0.5rem;
+  --mobile-card-gap: 0.75rem;
   grid-row: 2;
   display: grid;
   width: 100%;
@@ -914,26 +975,24 @@ watch(
   aspect-ratio: v-bind(THUMBNAIL_RATIO);
   padding: 0;
   margin: 0;
-  border: 3px solid #ffffff;
-  border-radius: 8px;
-  background: var(--panel);
+  border: 3px solid var(--paper);
+  border-radius: 10px;
+  background: var(--ink);
   cursor: pointer;
   overflow: hidden;
   line-height: 0;
-  box-shadow: 0 8px 24px rgb(0 0 0 / 25%);
-  transition: border-color 0.15s ease, filter 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+  box-shadow: 0 0 0 3px var(--ink), 0 4px 0 3px var(--ink);
+  transition: border-color 0.15s ease, filter 0.15s ease, transform 0.08s ease, box-shadow 0.08s ease;
 }
 
 .card:hover:not(:disabled) {
   border-color: var(--accent);
-  filter: brightness(1.08);
-  box-shadow: 0 10px 28px rgb(0 0 0 / 35%);
+  filter: brightness(1.06);
 }
 
 .card:active:not(:disabled) {
-  filter: brightness(0.96);
-  transform: scale(0.99);
-  box-shadow: 0 4px 14px rgb(0 0 0 / 20%);
+  transform: translateY(3px);
+  box-shadow: 0 0 0 3px var(--ink), 0 1px 0 3px var(--ink);
 }
 
 .card:disabled {
@@ -942,12 +1001,36 @@ watch(
 
 .card.is-correct {
   border-color: #34c759;
-  box-shadow: 0 0 16px rgb(52 199 89 / 40%), 0 8px 24px rgb(0 0 0 / 25%);
+  animation: card-pop 0.35s ease-out;
 }
 
 .card.is-incorrect {
   border-color: #ff3b30;
-  box-shadow: 0 0 16px rgb(255 59 48 / 40%), 0 8px 24px rgb(0 0 0 / 25%);
+  animation: card-shake 0.4s ease-in-out;
+}
+
+@keyframes card-pop {
+  40% {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes card-shake {
+  20% {
+    transform: translateX(-8px);
+  }
+
+  40% {
+    transform: translateX(8px);
+  }
+
+  60% {
+    transform: translateX(-5px);
+  }
+
+  80% {
+    transform: translateX(5px);
+  }
 }
 
 .feedback-overlay {
@@ -956,24 +1039,27 @@ watch(
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgb(0 0 0 / 35%);
+  background: rgb(0 0 0 / 25%);
   pointer-events: none;
 }
 
 .feedback-icon {
-  width: clamp(48px, 12vw, 104px);
-  height: clamp(48px, 12vw, 104px);
-  max-width: 75%;
-  max-height: 75%;
-  filter: drop-shadow(0 2px 8px rgb(0 0 0 / 60%));
+  width: auto;
+  height: min(clamp(44px, 11vw, 88px), 60%);
+  aspect-ratio: 1;
+  color: var(--paper);
+  border: 3px solid var(--ink);
+  border-radius: 50%;
+  box-shadow: 0 4px 0 var(--ink);
+  transform: rotate(-10deg);
 }
 
 .feedback-icon.is-correct {
-  color: #34c759;
+  background: #34c759;
 }
 
 .feedback-icon.is-incorrect {
-  color: #ff3b30;
+  background: #ff3b30;
 }
 
 .thumbnail-image {
@@ -988,40 +1074,44 @@ watch(
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0.5rem;
   min-width: 180px;
   min-height: 44px;
-  padding: 0.65rem 1.5rem;
+  padding: 0.5rem 1.75rem;
   background: var(--accent);
-  color: var(--accent-contrast);
-  border: 2px solid #ffffff;
-  border-radius: 6px;
-  font-family: var(--font-mono);
-  font-size: 1rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
+  color: var(--ink);
+  border: 3px solid var(--ink);
+  border-radius: 12px;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  line-height: 1;
+  letter-spacing: 0.05em;
   cursor: pointer;
-  box-shadow: 0 6px 20px rgb(0 0 0 / 25%);
-  transition: filter 0.15s ease, transform 0.1s ease, opacity 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 5px 0 var(--ink);
+  transition: filter 0.15s ease, transform 0.08s ease, background-color 0.15s ease, color 0.15s ease, box-shadow 0.08s ease;
 }
 
 .action-button:hover:not(:disabled) {
-  filter: brightness(1.08);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
+  filter: brightness(1.06);
 }
 
 .action-button:active:not(:disabled) {
-  filter: brightness(0.95);
-  transform: scale(0.98);
-  box-shadow: 0 4px 12px rgb(0 0 0 / 20%);
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 var(--ink);
 }
 
 .action-button:disabled {
-  background: #475569;
-  border-color: #64748b;
-  color: #cbd5e1;
+  background: var(--paper);
+  color: rgb(0 0 0 / 45%);
   cursor: not-allowed;
-  box-shadow: none;
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 var(--ink);
   filter: none;
+}
+
+.play-icon {
+  width: 0.8em;
+  height: 0.8em;
 }
 
 .play-button {
@@ -1043,24 +1133,22 @@ watch(
   width: var(--button-height);
   height: var(--button-height);
   padding: 0;
-  background: var(--accent);
-  color: var(--accent-contrast);
-  border: 2px solid #ffffff;
-  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 3px solid var(--ink);
+  border-radius: 12px;
   cursor: pointer;
-  box-shadow: 0 6px 20px rgb(0 0 0 / 25%);
-  transition: filter 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+  box-shadow: 0 4px 0 var(--ink);
+  transition: filter 0.15s ease, transform 0.08s ease, box-shadow 0.08s ease;
 }
 
 .pause-button:hover {
-  filter: brightness(1.08);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
+  filter: brightness(0.94);
 }
 
 .pause-button:active {
-  filter: brightness(0.95);
-  transform: scale(0.98);
-  box-shadow: 0 4px 12px rgb(0 0 0 / 20%);
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--ink);
 }
 
 .pause-icon {
@@ -1120,7 +1208,15 @@ watch(
     max-height: none;
     aspect-ratio: auto;
     border-width: 4px;
-    border-radius: 12px;
+    border-radius: 14px;
+  }
+
+  .card {
+    box-shadow: 0 0 0 3px var(--ink), 0 6px 0 3px var(--ink);
+  }
+
+  .card:active:not(:disabled) {
+    transform: translateY(5px);
   }
 
   .thumbnail-image {
@@ -1129,8 +1225,9 @@ watch(
   }
 
   .action-button {
-    min-height: 48px;
-    padding: 0.75rem 1.5rem;
+    min-height: 52px;
+    padding: 0.5rem 2rem;
+    font-size: 1.75rem;
   }
 
   .play-button {

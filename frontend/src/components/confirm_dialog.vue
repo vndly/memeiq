@@ -100,7 +100,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
-  background: rgb(0 0 0 / 65%);
+  background: color-mix(in srgb, var(--ground) 70%, transparent);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
 }
@@ -109,27 +109,25 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.25rem;
+  gap: 1.5rem;
   width: 100%;
   max-width: 400px;
-  padding: 2rem 1.75rem;
-  background: var(--panel);
-  border: 3px solid #ffffff;
-  border-radius: 12px;
-  box-shadow: 0 16px 40px rgb(0 0 0 / 60%);
+  padding: 2rem 1.75rem 2.25rem;
+  background: var(--paper);
+  border: 3px solid var(--ink);
+  border-radius: 20px;
+  box-shadow: 0 8px 0 var(--ink);
   text-align: center;
 }
 
 .dialog-title {
   font-family: var(--font-display);
-  font-size: clamp(2rem, 6vw, 2.5rem);
-  letter-spacing: 0.06em;
+  font-size: clamp(2.25rem, 8vw, 3rem);
+  font-weight: 400;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
-  color: var(--text-main);
-  line-height: 1.1;
-  -webkit-text-stroke: 1.5px #000000;
-  paint-order: stroke fill;
-  text-shadow: 0 4px 12px rgb(0 0 0 / 50%);
+  color: var(--ink);
+  line-height: 1;
 }
 
 .dialog-actions {
@@ -138,7 +136,6 @@ onUnmounted(() => {
   justify-content: center;
   gap: 1rem;
   width: 100%;
-  margin-top: 0.5rem;
 }
 
 .dialog-button {
@@ -146,37 +143,35 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 48px;
-  padding: 0.75rem 1.25rem;
-  border: 2px solid #ffffff;
-  border-radius: 6px;
-  font-family: var(--font-mono);
-  font-size: 1rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
+  min-height: 52px;
+  padding: 0.5rem 1.25rem;
+  border: 3px solid var(--ink);
+  border-radius: 12px;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  line-height: 1;
+  letter-spacing: 0.05em;
   cursor: pointer;
-  box-shadow: 0 6px 20px rgb(0 0 0 / 25%);
-  transition: filter 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+  box-shadow: 0 5px 0 var(--ink);
+  transition: filter 0.15s ease, transform 0.08s ease, box-shadow 0.08s ease;
 }
 
 .dialog-button:hover {
-  filter: brightness(1.08);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
+  filter: brightness(1.06);
 }
 
 .dialog-button:active {
-  filter: brightness(0.95);
-  transform: scale(0.98);
-  box-shadow: 0 4px 12px rgb(0 0 0 / 20%);
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 var(--ink);
 }
 
 .cancel-button {
   background: var(--accent);
-  color: var(--accent-contrast);
+  color: var(--ink);
 }
 
 .confirm-button {
   background: #ff3b30;
-  color: #ffffff;
+  color: var(--paper);
 }
 </style>

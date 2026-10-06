@@ -2,14 +2,12 @@
 
 :root {
   --ground: #0280fb;
-  --panel: #0b1a30;
+  --ink: #000000;
+  --paper: #ffffff;
   --text-main: #ffffff;
-  --text-dim: rgb(255 255 255 / 75%);
   --accent: #ffd000;
-  --accent-contrast: #0a0f1d;
 
   --font-ui: 'Instrument Sans', system-ui, sans-serif;
-  --font-mono: 'Azeret Mono', ui-monospace, monospace;
   --font-display: 'Anton', Impact, sans-serif;
 
   --bg: var(--ground);
@@ -46,8 +44,8 @@ button {
 }
 
 :focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -16,11 +16,11 @@ defineProps<{
 .spinner {
   width: 64px;
   height: 64px;
-  border: 6px solid #000000;
+  border: 8px solid var(--paper);
   border-top-color: var(--accent);
   border-radius: 50%;
+  box-shadow: 0 0 0 3px var(--ink), inset 0 0 0 3px var(--ink);
   animation: spin 0.8s linear infinite;
-  filter: drop-shadow(0 0 1px #000000) drop-shadow(0 4px 12px rgb(0 0 0 / 35%));
 }
 
 @keyframes spin {
