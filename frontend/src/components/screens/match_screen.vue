@@ -807,7 +807,8 @@ watch(
 
   position: relative;
   display: grid;
-  grid-template-rows: 1fr auto 1fr;
+  /* Cards take all the height left between the counter and the play button */
+  grid-template-rows: minmax(var(--button-height), auto) minmax(0, 1fr) minmax(var(--button-height), auto);
   grid-template-columns: 100%;
   justify-items: center;
   row-gap: var(--stage-gap);
@@ -944,11 +945,13 @@ watch(
 .thumbnails--easy {
   --card-max-height: calc((100dvh - var(--ui-overhead) - 2 * var(--mobile-card-gap)) / 3);
   grid-template-columns: 1fr;
+  align-content: space-evenly;
 }
 
 .thumbnails--medium {
   --card-max-height: calc((100dvh - var(--ui-overhead) - 3 * var(--mobile-card-gap)) / 4);
   grid-template-columns: 1fr;
+  align-content: space-evenly;
 }
 
 .thumbnails--hard {
@@ -1168,6 +1171,12 @@ watch(
     max-height: none;
     overflow: visible;
     padding: 1.5rem var(--card-gap);
+    grid-template-rows: 1fr auto 1fr;
+  }
+
+  .thumbnails--easy,
+  .thumbnails--medium {
+    align-content: center;
   }
 
   .thumbnails {
