@@ -958,8 +958,9 @@ watch(
 }
 
 .thumbnails--hard {
-  --card-max-height: calc((100cqh - 2 * var(--mobile-card-gap)) / 3);
-  grid-template-columns: repeat(2, 1fr);
+  --card-max-height: calc((100cqh - 5 * var(--mobile-card-gap)) / 6);
+  grid-template-columns: 1fr;
+  align-content: space-evenly;
 }
 
 .card {
@@ -1189,7 +1190,8 @@ watch(
   }
 
   .thumbnails--easy,
-  .thumbnails--medium {
+  .thumbnails--medium,
+  .thumbnails--hard {
     align-content: center;
   }
 
