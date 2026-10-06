@@ -942,36 +942,26 @@ watch(
 }
 
 .thumbnails--easy {
+  --card-max-height: calc((100dvh - var(--ui-overhead) - 2 * var(--mobile-card-gap)) / 3);
   grid-template-columns: 1fr;
-}
-
-.thumbnails--easy .card {
-  max-height: calc((100dvh - var(--ui-overhead) - 2 * var(--mobile-card-gap)) / 3);
 }
 
 .thumbnails--medium {
+  --card-max-height: calc((100dvh - var(--ui-overhead) - 3 * var(--mobile-card-gap)) / 4);
   grid-template-columns: 1fr;
 }
 
-.thumbnails--medium .card {
-  max-height: calc((100dvh - var(--ui-overhead) - 3 * var(--mobile-card-gap)) / 4);
-}
-
 .thumbnails--hard {
+  --card-max-height: calc((100dvh - var(--ui-overhead) - 2 * var(--mobile-card-gap)) / 3);
   grid-template-columns: repeat(2, 1fr);
-}
-
-.thumbnails--hard .card {
-  max-height: calc((100dvh - var(--ui-overhead) - 2 * var(--mobile-card-gap)) / 3);
 }
 
 .card {
   position: relative;
   display: block;
+  /* Size comes only from the layout, never from the thumbnail, so every card matches */
+  width: min(100%, calc(var(--card-max-height) * v-bind(THUMBNAIL_RATIO)));
   height: auto;
-  width: auto;
-  max-height: 100%;
-  max-width: 100%;
   aspect-ratio: v-bind(THUMBNAIL_RATIO);
   padding: 0;
   margin: 0;
@@ -1063,6 +1053,8 @@ watch(
 }
 
 .thumbnail-image {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
@@ -1199,14 +1191,8 @@ watch(
     grid-template-rows: none;
   }
 
-  .card,
-  .thumbnails--easy .card,
-  .thumbnails--medium .card,
-  .thumbnails--hard .card {
-    height: auto;
+  .card {
     width: 100%;
-    max-height: none;
-    aspect-ratio: auto;
     border-width: 4px;
     border-radius: 14px;
   }
@@ -1217,11 +1203,6 @@ watch(
 
   .card:active:not(:disabled) {
     transform: translateY(5px);
-  }
-
-  .thumbnail-image {
-    aspect-ratio: v-bind(THUMBNAIL_RATIO);
-    height: auto;
   }
 
   .action-button {
