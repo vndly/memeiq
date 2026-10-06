@@ -1,5 +1,7 @@
 # Bug Findings
 
+ADD BUTTON SOUNDS TO THE GAME
+
 ## Medium
 
 ### [c/api-or-library-misuse/match-leave-guard/back-navigation-replayed-as-push] Leaving a match pushes a new home entry, so the Back button can never get past the match
@@ -24,8 +26,9 @@
 - **Evidence / verification:** Reproduced with an isolated scratch test that imports `youtube_player.ts` from a disposable copy of `HEAD` and uses a minimal fake DOM:
   - Attempt 1 appends one script; firing its `onerror` rejects with "Failed to load YouTube IFrame API script".
   - Attempt 2 appends no new script (count stays 1) and rejects with "Timed out waiting for YouTube IFrame API" only once the timeout fires.
-  
+
   An independent refutation pass confirmed the path. The stage clock is reset during loading, so the cost is delay and missing audio, not score.
+
 - **Suggested fix:** In the script `onerror` handler, remove the failed element (and restore the previous ready handler) before rejecting, so the next call injects a fresh script. Optionally, give up after a few failed stages instead of waiting the full timeout every time.
 
 ### [a/error-handling/match-stage/player-ready-wait-unbounded] A stage spins forever when the YouTube embed never reports ready or failed
@@ -40,8 +43,9 @@
   - The `loadStage` reveal (`match_screen.vue:162-177`) waits on `loadAudio()`, whose resolver is called only from the `onReady`/`onError` callbacks or the no-video-id branch (`match_screen.vue:416-444`).
   - `YouTubeAudioPlayer.mount` reports errors only for API-script failures (`youtube_player.ts:185-189`). Player-level errors (2/5/100/101/150) need a live player inside the iframe.
   - Thumbnails always settle, because both `onload` and `onerror` resolve (`thumbnail_loader.ts:36-41`).
-  
+
   An independent refutation pass confirmed the code path and noted Pause → QUIT still works. Remaining assumption, not verifiable offline: the YouTube widget API emits no event when its iframe document fails to load.
+
 - **Suggested fix:** Race the audio load against a readiness timeout, for example 10–15 s, matching the script timeout. On expiry, treat the stage as audio-unavailable (set the unavailable flag and settle the load) and destroy the stuck player.
 
 ### [a/error-handling/match-stage/manual-play-assumed-successful] PLAY marks the audio as played before playback starts and can't be retried
@@ -67,8 +71,9 @@
   - drops the fixed `100dvh` height and `overflow: hidden`
   - lays medium and hard out as two rows of about 249×144 px cards
   - replaces the safe-area-based paddings with a flat 1.5rem
-  
+
   The content totals about 552 px against a roughly 390 px viewport. The bottom card row is partly hidden and PLAY is fully below the fold, so the user has to scroll every stage while the penalty clock runs. The edge cards and the pause button also lose the notch inset, though that part is mostly cosmetic (24 px padding against a 47–59 px inset). This contradicts the project's documented requirement of safe-area accommodation and seamless mobile layouts.
+
 - **Trigger:** Play a medium or hard match on a phone in landscape orientation.
 - **Evidence / verification:** Computed from the stylesheet. For 844×390, medium and hard give 24 (padding) + 52 (counter row) + 44 (gap) + about 311 (2 card rows and gap) + 44 (gap) + 52 (PLAY) + 24 (padding) ≈ 552 px. Easy comes to about 384 px, which is borderline. An independent refutation pass recomputed the same numbers and found no height condition or later rule that restores the mobile layout. Not rendered on a device.
 - **Suggested fix:** Gate the wide layout on height as well, for example `(min-width: 768px) and (min-height: 600px)`, or on `(hover: hover)`. Alternatively, keep the fixed-viewport sizing and the `max(…, env(safe-area-inset-*))` paddings in the wide layout.
@@ -173,8 +178,8 @@ By severity: Medium (4 findings), Low (9 findings).
 By confidence: High (6 findings), Medium (4 findings), Low (3 findings).
 
 | Severity | High | Medium | Low |
-| --- | --- | --- | --- |
-| Medium | 2 | 1 | 1 |
-| Low | 4 | 3 | 2 |
+| -------- | ---- | ------ | --- |
+| Medium   | 2    | 1      | 1   |
+| Low      | 4    | 3      | 2   |
 
 By Likelihood: High (0 findings), Medium (3 findings), Low (10 findings).
