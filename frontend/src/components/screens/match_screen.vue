@@ -629,7 +629,10 @@ watch(
 </script>
 
 <template>
-  <main class="match-screen">
+  <main
+    class="match-screen"
+    :class="{'is-play-button-hidden': !isPlayButtonVisible}"
+  >
     <h1 class="visually-hidden">
       Match
     </h1>
@@ -802,8 +805,6 @@ watch(
   --counter-size: 1.75rem;
   --button-height: 44px;
   --stage-gap: 0.75rem;
-  /* Rows above and below the cards share the same height, sized for the taller of counter and button */
-  --ui-overhead: calc(var(--safe-top) + var(--safe-bottom) + 2 * var(--button-height) + 2 * var(--stage-gap));
 
   position: relative;
   display: grid;
@@ -931,6 +932,8 @@ watch(
 
 .thumbnails {
   --mobile-card-gap: 0.75rem;
+  /* Cards are sized from the height this container gets, so they grow when the play button is not shown */
+  container-type: size;
   grid-row: 2;
   display: grid;
   width: 100%;
@@ -943,19 +946,19 @@ watch(
 }
 
 .thumbnails--easy {
-  --card-max-height: calc((100dvh - var(--ui-overhead) - 2 * var(--mobile-card-gap)) / 3);
+  --card-max-height: calc((100cqh - 2 * var(--mobile-card-gap)) / 3);
   grid-template-columns: 1fr;
   align-content: space-evenly;
 }
 
 .thumbnails--medium {
-  --card-max-height: calc((100dvh - var(--ui-overhead) - 3 * var(--mobile-card-gap)) / 4);
+  --card-max-height: calc((100cqh - 3 * var(--mobile-card-gap)) / 4);
   grid-template-columns: 1fr;
   align-content: space-evenly;
 }
 
 .thumbnails--hard {
-  --card-max-height: calc((100dvh - var(--ui-overhead) - 2 * var(--mobile-card-gap)) / 3);
+  --card-max-height: calc((100cqh - 2 * var(--mobile-card-gap)) / 3);
   grid-template-columns: repeat(2, 1fr);
 }
 
@@ -1118,6 +1121,17 @@ watch(
   visibility: hidden;
 }
 
+@media (max-width: 767px) {
+  /* Without the play button, the cards use the space down to the bottom of the screen */
+  .match-screen.is-play-button-hidden {
+    grid-template-rows: minmax(var(--button-height), auto) minmax(0, 1fr);
+  }
+
+  .play-button.is-hidden {
+    display: none;
+  }
+}
+
 .pause-button {
   position: absolute;
   top: var(--safe-top);
@@ -1180,6 +1194,7 @@ watch(
   }
 
   .thumbnails {
+    container-type: normal;
     max-width: 100%;
     gap: var(--card-gap);
   }
