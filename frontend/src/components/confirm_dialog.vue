@@ -100,9 +100,9 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
-  background: color-mix(in srgb, var(--ground) 70%, transparent);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  background: color-mix(in srgb, var(--ground) 55%, transparent);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 .dialog-container {
