@@ -1,5 +1,7 @@
 # Bug Findings
 
+FIX BLUR
+
 ADD BUTTON SOUNDS TO THE GAME
 
 ## Medium

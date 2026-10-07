@@ -662,6 +662,24 @@ watch(
       <p class="results-correct">
         {{ correctAnswerCount }}/{{ stageCount }} correct
       </p>
+      <dl class="results-settings">
+        <div class="results-setting">
+          <dt class="results-setting-caption">
+            Memes
+          </dt>
+          <dd class="results-setting-frame">
+            <span class="results-setting-value results-setting-value--count">{{ stageCount }}</span>
+          </dd>
+        </div>
+        <div class="results-setting">
+          <dt class="results-setting-caption">
+            Difficulty
+          </dt>
+          <dd class="results-setting-frame">
+            <span class="results-setting-value">{{ difficulty }}</span>
+          </dd>
+        </div>
+      </dl>
       <button
         type="button"
         class="action-button"
@@ -865,7 +883,12 @@ watch(
 
 .results {
   grid-row: 1 / -1;
-  align-self: center;
+  /* Scrolls from the top instead of clipping when the column is taller than short landscape screens */
+  align-self: safe center;
+  max-height: 100%;
+  overflow-y: auto;
+  /* Room for the outline strokes, drop shadows and tilted IQ badge inside the scroll box */
+  padding: 0.75rem 1rem;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -924,6 +947,63 @@ watch(
   -webkit-text-stroke: 5px var(--ink);
   paint-order: stroke fill;
   text-shadow: 0 3px 0 var(--ink);
+}
+
+.results-settings {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem 1.25rem;
+}
+
+.results-setting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.results-setting-caption {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-main);
+  -webkit-text-stroke: 4px var(--ink);
+  paint-order: stroke fill;
+  text-shadow: 0 2px 0 var(--ink);
+}
+
+.results-setting-frame {
+  display: flex;
+  padding: 4px;
+  background: var(--paper);
+  border: 3px solid var(--ink);
+  border-radius: 12px;
+  box-shadow: 0 4px 0 var(--ink);
+}
+
+.results-setting-value {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 4.5rem;
+  min-height: 36px;
+  padding: 0 0.75rem;
+  border-radius: 8px;
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--paper);
+  background: var(--ink);
+}
+
+.results-setting-value--count {
+  font-size: 1.375rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .results .action-button {
