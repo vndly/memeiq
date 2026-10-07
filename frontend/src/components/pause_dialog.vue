@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {onUnmounted, watch} from 'vue'
+import {playButtonSound} from '@/services/sound_effects'
 
 export interface PauseDialogProps {
   isOpen: boolean
@@ -20,6 +21,22 @@ function handleKeydown(event: KeyboardEvent): void {
   if (event.key === 'Escape') {
     emit('resume')
   }
+}
+
+/**
+ * Resumes the match from the continue button.
+ */
+function handleResumeClick(): void {
+  playButtonSound()
+  emit('resume')
+}
+
+/**
+ * Asks to leave the match from the quit button.
+ */
+function handleQuitClick(): void {
+  playButtonSound()
+  emit('quit')
 }
 
 watch(
@@ -65,14 +82,14 @@ onUnmounted(() => {
         <button
           type="button"
           class="dialog-button resume-button"
-          @click="emit('resume')"
+          @click="handleResumeClick"
         >
           CONTINUE
         </button>
         <button
           type="button"
           class="dialog-button quit-button"
-          @click="emit('quit')"
+          @click="handleQuitClick"
         >
           QUIT
         </button>

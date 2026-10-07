@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import LoadingSpinner from '@/components/loading_spinner.vue'
 import {catalogueError, fetchMemeCatalogue, isCatalogueLoading} from '@/services/meme_catalogue'
+import {playButtonSound} from '@/services/sound_effects'
 
 /**
  * Retries fetching the meme catalogue.
  */
 function retryFetch(): void {
+  playButtonSound()
   void fetchMemeCatalogue()
 }
 </script>

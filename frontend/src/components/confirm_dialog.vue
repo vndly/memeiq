@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {onUnmounted, watch} from 'vue'
+import {playButtonSound} from '@/services/sound_effects'
 
 export interface ConfirmDialogProps {
   isOpen: boolean
@@ -30,6 +31,22 @@ function handleKeydown(event: KeyboardEvent): void {
   if (event.key === 'Escape') {
     emit('cancel')
   }
+}
+
+/**
+ * Cancels from the cancel button.
+ */
+function handleCancelClick(): void {
+  playButtonSound()
+  emit('cancel')
+}
+
+/**
+ * Confirms from the confirm button.
+ */
+function handleConfirmClick(): void {
+  playButtonSound()
+  emit('confirm')
 }
 
 watch(
@@ -75,14 +92,14 @@ onUnmounted(() => {
         <button
           type="button"
           class="dialog-button cancel-button"
-          @click="emit('cancel')"
+          @click="handleCancelClick"
         >
           {{ cancelText }}
         </button>
         <button
           type="button"
           class="dialog-button confirm-button"
-          @click="emit('confirm')"
+          @click="handleConfirmClick"
         >
           {{ confirmText }}
         </button>

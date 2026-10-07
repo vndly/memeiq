@@ -1,9 +1,3 @@
-# Bug Findings
-
-FIX BLUR
-
-ADD BUTTON SOUNDS TO THE GAME
-
 ## Medium
 
 ### [c/api-or-library-misuse/match-leave-guard/back-navigation-replayed-as-push] Leaving a match pushes a new home entry, so the Back button can never get past the match
@@ -172,16 +166,3 @@ ADD BUTTON SOUNDS TO THE GAME
 - **Trigger:** Play `/match?difficulty=easy…`, then reach `/match?difficulty=hard…` through home. During that match, use the long-press Back menu to jump to the older easy entry.
 - **Evidence / verification:** Traced: vue-router classifies a `/match` → `/match` navigation as "updating" (`extractChangingRecords`). `RouterView` has no key, so the component is reused, and the `[difficulty, matchLength]` watcher calls `haltPlayback()` and `startMatch()`. The refutation pass confirmed this (no restart when the values are identical).
 - **Suggested fix:** Register `onBeforeRouteUpdate` with the same confirmation flow as the leave guard, or key the router view by full path so the leave guard applies.
-
-## Summary
-
-By severity: Medium (4 findings), Low (9 findings).
-
-By confidence: High (6 findings), Medium (4 findings), Low (3 findings).
-
-| Severity | High | Medium | Low |
-| -------- | ---- | ------ | --- |
-| Medium   | 2    | 1      | 1   |
-| Low      | 4    | 3      | 2   |
-
-By Likelihood: High (0 findings), Medium (3 findings), Low (10 findings).

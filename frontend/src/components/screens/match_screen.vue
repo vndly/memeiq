@@ -10,6 +10,7 @@ import PauseDialog from '@/components/pause_dialog.vue'
 import {DEFAULT_DIFFICULTY, DEFAULT_MATCH_LENGTH, DIFFICULTY_CARD_COUNTS, IQ_PENALTY_SECONDS_PER_POINT, MAX_IQ_SCORE, THUMBNAIL_RATIO} from '@/constants'
 import {analytics} from '@/services/analytics'
 import {getMatchMemeCount, memeCatalogue, pickStageMemes, shuffleMemes} from '@/services/meme_catalogue'
+import {playButtonSound} from '@/services/sound_effects'
 import {loadThumbnail} from '@/services/thumbnail_loader'
 import {extractYouTubeVideoId, getYouTubeThumbnailUrl} from '@/services/youtube'
 import {YouTubeAudioPlayer} from '@/services/youtube_player'
@@ -472,6 +473,7 @@ function handlePlayClick(): void {
     return
   }
 
+  playButtonSound()
   isPlayButtonPressed.value = true
   hasAudioPlayed.value = true
   startStageClock()
@@ -512,6 +514,7 @@ function handlePauseClick(): void {
   if (isDialogOpen.value) {
     return
   }
+  playButtonSound()
   pauseMatch()
 }
 
@@ -574,6 +577,7 @@ function handleCancelLeave(): void {
  * Returns to the main menu after the match is complete.
  */
 function handleMenuClick(): void {
+  playButtonSound()
   void router.push({
     name: 'home',
   })

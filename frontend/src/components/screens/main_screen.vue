@@ -3,6 +3,7 @@ import {computed, ref} from 'vue'
 import {useRouter} from 'vue-router'
 import {analytics} from '@/services/analytics'
 import {getMatchMemeCount} from '@/services/meme_catalogue'
+import {playButtonSound} from '@/services/sound_effects'
 import type {Difficulty} from '@/types/difficulty'
 import type {MatchLength} from '@/types/match_length'
 
@@ -52,6 +53,7 @@ const matchLengthOptions = computed<MatchLengthOption[]>(() => {
  * Navigates to the match screen with the selected difficulty and match length.
  */
 function handleStartClick(): void {
+  playButtonSound()
   analytics.trackMatchStart(selectedDifficulty.value, selectedMatchLength.value)
   void router.push({
     name: 'match',
@@ -92,6 +94,7 @@ function handleStartClick(): void {
                 name="match-length"
                 class="option-input"
                 :value="option.matchLength"
+                @change="playButtonSound"
               >
               <span class="option-label option-label--count">{{ option.memeCount }}</span>
             </label>
@@ -119,6 +122,7 @@ function handleStartClick(): void {
                 name="difficulty"
                 class="option-input"
                 :value="option.difficulty"
+                @change="playButtonSound"
               >
               <span class="option-label">{{ option.label }}</span>
             </label>
