@@ -3,6 +3,7 @@ import {computed, onMounted, onUnmounted, ref, watch} from 'vue'
 import {onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter} from 'vue-router'
 import type {LocationQuery, RouteLocationNormalized, RouteLocationRaw} from 'vue-router'
 import failAudioUrl from '@/assets/fail.mp3'
+import finishedAudioUrl from '@/assets/finished.mp3'
 import winAudioUrl from '@/assets/win.mp3'
 import ConfirmDialog from '@/components/confirm_dialog.vue'
 import LoadingSpinner from '@/components/loading_spinner.vue'
@@ -85,6 +86,7 @@ const displayedIqScore = ref(0)
 
 const winAudio = typeof Audio !== 'undefined' ? new Audio(winAudioUrl) : null
 const failAudio = typeof Audio !== 'undefined' ? new Audio(failAudioUrl) : null
+const finishedAudio = typeof Audio !== 'undefined' ? new Audio(finishedAudioUrl) : null
 
 let audioPlayer: YouTubeAudioPlayer | null = null
 let resetTimeoutId: ReturnType<typeof setTimeout> | null = null
@@ -206,6 +208,7 @@ function advanceStage(): void {
     stopSoundEffects()
     audioPlayer?.destroy()
     isMatchComplete.value = true
+    playSoundEffect(finishedAudio)
     startIqCountUp()
     return
   }
@@ -299,6 +302,10 @@ function stopSoundEffects(): void {
   if (failAudio !== null) {
     failAudio.pause()
     failAudio.currentTime = 0
+  }
+  if (finishedAudio !== null) {
+    finishedAudio.pause()
+    finishedAudio.currentTime = 0
   }
 }
 
