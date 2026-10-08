@@ -561,7 +561,7 @@ function handleConfirmLeave(): void {
   const destination = targetRoute.value ?? {
     name: 'home',
   }
-  void router.push(destination)
+  leaveMatch(destination)
 }
 
 /**
@@ -578,9 +578,24 @@ function handleCancelLeave(): void {
  */
 function handleMenuClick(): void {
   playButtonSound()
-  void router.push({
+  leaveMatch({
     name: 'home',
   })
+}
+
+/**
+ * Leaves the match screen without stacking a new history entry on top of it.
+ * Steps back when the previous entry is the destination, so Back cannot return to the match;
+ * otherwise replaces the match entry.
+ * @param destination - Route to navigate to.
+ */
+function leaveMatch(destination: RouteLocationRaw): void {
+  const previousPath = router.options.history.state.back
+  if (previousPath === router.resolve(destination).fullPath) {
+    router.back()
+  } else {
+    void router.replace(destination)
+  }
 }
 
 onBeforeRouteLeave((to) => {
