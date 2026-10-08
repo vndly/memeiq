@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {computed, onMounted, onUnmounted, ref, watch} from 'vue'
-import {onBeforeRouteLeave, useRoute, useRouter} from 'vue-router'
-import type {RouteLocationRaw} from 'vue-router'
+import {onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter} from 'vue-router'
+import type {LocationQuery, RouteLocationNormalized, RouteLocationRaw} from 'vue-router'
 import failAudioUrl from '@/assets/fail.mp3'
 import winAudioUrl from '@/assets/win.mp3'
 import ConfirmDialog from '@/components/confirm_dialog.vue'
@@ -27,20 +27,38 @@ const isConfirmOpen = ref(false)
 const isNavigationConfirmed = ref(false)
 const targetRoute = ref<RouteLocationRaw | null>(null)
 
-const difficulty = computed<Difficulty>(() => {
-  const queryDifficulty = route.query.difficulty
+/**
+ * Reads the match difficulty from a route query.
+ * @param query - Route query to read.
+ * @returns The queried difficulty, or the default when missing or invalid.
+ */
+function parseDifficulty(query: LocationQuery): Difficulty {
+  const queryDifficulty = query.difficulty
   if (typeof queryDifficulty === 'string' && isDifficulty(queryDifficulty)) {
     return queryDifficulty
   }
   return DEFAULT_DIFFICULTY
-})
+}
 
-const matchLength = computed<MatchLength>(() => {
-  const queryMatchLength = route.query.length
+/**
+ * Reads the match length from a route query.
+ * @param query - Route query to read.
+ * @returns The queried match length, or the default when missing or invalid.
+ */
+function parseMatchLength(query: LocationQuery): MatchLength {
+  const queryMatchLength = query.length
   if (typeof queryMatchLength === 'string' && isMatchLength(queryMatchLength)) {
     return queryMatchLength
   }
   return DEFAULT_MATCH_LENGTH
+}
+
+const difficulty = computed<Difficulty>(() => {
+  return parseDifficulty(route.query)
+})
+
+const matchLength = computed<MatchLength>(() => {
+  return parseMatchLength(route.query)
 })
 
 const cardCount = computed<number>(() => {
@@ -610,7 +628,12 @@ function leaveMatch(destination: RouteLocationRaw): void {
   }
 }
 
-onBeforeRouteLeave((to) => {
+/**
+ * Holds navigation that would abandon an in-progress match until the player confirms it, pausing the match to ask.
+ * @param to - Route being navigated to.
+ * @returns Whether the navigation may proceed.
+ */
+function guardMatchExit(to: RouteLocationNormalized): boolean {
   if (isNavigationConfirmed.value || isMatchComplete.value) {
     return true
   }
@@ -620,6 +643,18 @@ onBeforeRouteLeave((to) => {
     pauseMatch()
   }
   return false
+}
+
+onBeforeRouteLeave((to) => {
+  return guardMatchExit(to)
+})
+
+// Navigating between match URLs reuses this screen and skips the leave guard, so a settings change restarting the match needs the same confirmation
+onBeforeRouteUpdate((to) => {
+  if (parseDifficulty(to.query) === difficulty.value && parseMatchLength(to.query) === matchLength.value) {
+    return true
+  }
+  return guardMatchExit(to)
 })
 
 onMounted(() => {
@@ -644,6 +679,9 @@ watch(
     matchLength,
   ],
   () => {
+    // A confirmed settings change restarts the match in place, so the new match must guard its own exit again
+    isNavigationConfirmed.value = false
+    targetRoute.value = null
     haltPlayback()
     startMatch()
   },
