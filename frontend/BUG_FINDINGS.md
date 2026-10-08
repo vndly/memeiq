@@ -1,14 +1,3 @@
-### [a/concurrency/match-audio/ended-clip-replayed-on-resume] A clip that ends just as the user pauses replays from the start on resume
-
-- **Location:** `frontend/src/components/screens/match_screen.vue:499` (paused-by-dialog flag captured from the playing state). Related: `frontend/src/components/screens/match_screen.vue:535-536` (resume calls the player's resume), `frontend/src/services/youtube_player.ts:229-234` (`playVideo` with no ended check), `frontend/src/services/youtube_player.ts:294-297`.
-- **Severity:** Low
-- **Confidence:** Medium
-- **Likelihood:** Low. The window is only the delay before the player's ENDED message arrives.
-- **Defect:** Pausing records whether the clip was playing, from the player's local flag. If the clip ends in the instant before that, the ENDED state change arrives after the flag was captured as true. On CONTINUE, the screen calls the player's resume, which calls `playVideo()` on the ended video and plays the whole clip again, although each stage is designed to play its clip once.
-- **Trigger:** Press pause within a few milliseconds of the clip ending, then press CONTINUE.
-- **Evidence / verification:** Traced: `pauseMatch` reads `audioPlayer.playing` before `pause()`. `handleStateChange` clears the flag on ENDED but does not touch the screen's paused-by-dialog flag. `handleResume` then calls `resume()`, and `resume()` sets playing and calls `playVideo()`. The refutation pass confirmed the sequence and rated the impact negligible: one extra listen.
-- **Suggested fix:** In resume, skip `playVideo()` when the player state is ENDED. Alternatively, have the screen clear its paused-by-dialog flag when the ended callback fires.
-
 ### [a/null-and-numeric-hazards/match-results/iq-count-up-negative-progress] The results IQ count-up can show a negative number for one frame
 
 - **Location:** `frontend/src/components/screens/match_screen.vue:207-211` (progress not clamped at 0). Related: `frontend/src/components/screens/match_screen.vue:182-190`.

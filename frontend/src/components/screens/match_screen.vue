@@ -413,7 +413,8 @@ function setupAudioPlayer(): void {
   if (audioPlayer === null) {
     audioPlayer = new YouTubeAudioPlayer({
       onEnded: (): void => {
-        // Audio is played once per stage; nothing to reset when it ends
+        // Audio is played once per stage; a clip that ends just as the pause dialog opens must not replay on resume
+        isAudioPausedByDialog = false
       },
       onError: (): void => {
         isPlayerReady.value = false
