@@ -1,20 +1,3 @@
-### [a/error-handling/match-stage/player-ready-wait-unbounded] A stage spins forever when the YouTube embed never reports ready or failed
-
-- **Location:** `frontend/src/components/screens/match_screen.vue:162` (stage reveal waits on thumbnails and audio with no timeout). Related: `frontend/src/components/screens/match_screen.vue:232-247` (the audio load resolves only from player callbacks), `frontend/src/components/screens/match_screen.vue:409-445`, `frontend/src/services/youtube_player.ts:156-184` (only onReady and onError settle a mounted player).
-- **Severity:** Medium
-- **Confidence:** Medium
-- **Likelihood:** Low. It needs the embed iframe to fail silently after the API script has loaded: a network drop between stages, or an extension that blocks or click-to-loads `youtube.com/embed`.
-- **Defect:** The stage reveal waits for the audio load, which resolves only on the player's onReady or onError, a failure to load the API script, or a missing video id. Nothing bounds the wait. If the per-stage iframe never completes the IFrame API handshake, neither callback fires and the stage spinner stays up for good. The existing fallback that lets the user answer without audio is never reached, and nothing retries. The only way out is Pause → QUIT → LEAVE, which loses the match.
-- **Trigger:** Play a few stages, so the API script is loaded, then lose connectivity just as the next stage creates its iframe. The iframe fails to load and no event ever reaches the page. Restoring the network does not recover the stage.
-- **Evidence / verification:** Traced statically:
-  - The `loadStage` reveal (`match_screen.vue:162-177`) waits on `loadAudio()`, whose resolver is called only from the `onReady`/`onError` callbacks or the no-video-id branch (`match_screen.vue:416-444`).
-  - `YouTubeAudioPlayer.mount` reports errors only for API-script failures (`youtube_player.ts:185-189`). Player-level errors (2/5/100/101/150) need a live player inside the iframe.
-  - Thumbnails always settle, because both `onload` and `onerror` resolve (`thumbnail_loader.ts:36-41`).
-
-  An independent refutation pass confirmed the code path and noted Pause → QUIT still works. Remaining assumption, not verifiable offline: the YouTube widget API emits no event when its iframe document fails to load.
-
-- **Suggested fix:** Race the audio load against a readiness timeout, for example 10–15 s, matching the script timeout. On expiry, treat the stage as audio-unavailable (set the unavailable flag and settle the load) and destroy the stuck player.
-
 ### [a/error-handling/match-stage/manual-play-assumed-successful] PLAY marks the audio as played before playback starts and can't be retried
 
 - **Location:** `frontend/src/components/screens/match_screen.vue:475-477` (pressed flag, audio-played flag and clock set before any PLAYING event). Related: `frontend/src/components/screens/match_screen.vue:93-99` (cards unlock and PLAY disables on those flags), `frontend/src/components/screens/match_screen.vue:424-430` (the real PLAYING callback), `frontend/src/services/youtube_player.ts:205-213`.
@@ -26,25 +9,6 @@
 - **Evidence / verification:** Traced: `handlePlayClick` sets `isPlayButtonPressed`, `hasAudioPlayed` and calls `startStageClock()` before `audioPlayer.play()`. The only paths that reset these flags are a new stage's `loadStage`. An independent refutation pass confirmed the path. Remaining assumptions (unverified, no device testing): whether a target browser, most plausibly iOS Safari, actually blocks the tap-delegated `playVideo()`. Chrome likely allows it through the iframe's autoplay delegation and the page's sticky user activation.
 - **Suggested fix:** Set the audio-played flag only in the PLAYING callback. After PLAY, keep the button re-enabled, or re-enable it after a short timeout, until PLAYING arrives. If it never does, fall back to the audio-unavailable path explicitly.
 
-## Low
-
-### [a/boundary-and-encoding-cases/match-layout/landscape-phone-gets-desktop-layout] Landscape phones get the desktop match layout: medium/hard overflow the viewport and PLAY is below the fold
-
-- **Location:** `frontend/src/components/screens/match_screen.vue:1169-1179` (width-only wide layout replaces height and padding). Related: `frontend/src/components/screens/match_screen.vue:797-821` (fixed-viewport sizing and safe-area paddings), `frontend/src/components/screens/match_screen.vue:1191-1200`, `frontend/src/components/screens/match_screen.vue:1237-1241` (pause button offsets), `frontend/index.html:5` (`viewport-fit=cover`).
-- **Severity:** Low
-- **Confidence:** Medium
-- **Likelihood:** Medium. Most current phones are at least 768 CSS px wide in landscape, so anyone who plays medium or hard with the phone rotated gets this layout.
-- **Defect:** The wide layout depends only on width. A landscape phone (for example 844×390) switches to it, which:
-  - drops the fixed `100dvh` height and `overflow: hidden`
-  - lays medium and hard out as two rows of about 249×144 px cards
-  - replaces the safe-area-based paddings with a flat 1.5rem
-
-  The content totals about 552 px against a roughly 390 px viewport. The bottom card row is partly hidden and PLAY is fully below the fold, so the user has to scroll every stage while the penalty clock runs. The edge cards and the pause button also lose the notch inset, though that part is mostly cosmetic (24 px padding against a 47–59 px inset). This contradicts the project's documented requirement of safe-area accommodation and seamless mobile layouts.
-
-- **Trigger:** Play a medium or hard match on a phone in landscape orientation.
-- **Evidence / verification:** Computed from the stylesheet. For 844×390, medium and hard give 24 (padding) + 52 (counter row) + 44 (gap) + about 311 (2 card rows and gap) + 44 (gap) + 52 (PLAY) + 24 (padding) ≈ 552 px. Easy comes to about 384 px, which is borderline. An independent refutation pass recomputed the same numbers and found no height condition or later rule that restores the mobile layout. Not rendered on a device.
-- **Suggested fix:** Gate the wide layout on height as well, for example `(min-width: 768px) and (min-height: 600px)`, or on `(hover: hover)`. Alternatively, keep the fixed-viewport sizing and the `max(…, env(safe-area-inset-*))` paddings in the wide layout.
-
 ### [a/logic-errors/analytics/match-start-and-pause-events-skipped] `match_start` and `pause_dialog_shown` analytics events are skipped on some paths
 
 - **Location:** `frontend/src/components/screens/match_screen.vue:567-571` (STAY reopens the pause dialog without logging). Related: `frontend/src/components/screens/main_screen.vue:55` (the only `match_start` call), `frontend/src/components/screens/match_screen.vue:594-596` (every mount starts a match), `frontend/src/services/analytics.ts:77-100`.
@@ -55,19 +19,6 @@
 - **Trigger:** Reload during a match, or press Back from home into `/match`: a new match runs with no `match_start`. Or open pause → QUIT → STAY: the pause dialog shows again with no `pause_dialog_shown`.
 - **Evidence / verification:** Traced: `trackMatchStart` is called only in `handleStartClick` (`main_screen.vue:55`), while `startMatch` runs from `onMounted` on every mount (`match_screen.vue:594-596`). `handleCancelLeave` sets `isPauseOpen = true` without calling `trackPauseDialogShown` (`match_screen.vue:567-571`). The refutation pass confirmed both.
 - **Suggested fix:** Log `match_start` from the match screen's `startMatch` with the resolved difficulty and length, and remove the menu-side call. Log `pause_dialog_shown` from `handleCancelLeave` too, or wherever the pause dialog's open flag becomes true.
-
-### [a/state-and-lifecycle/leave-dialog/background-controls-active-while-modal] Pause and leave dialogs don't block keyboard input to the match behind them
-
-- **Location:** `frontend/src/components/screens/match_screen.vue:367-369` (card handler ignores open dialogs). Related: `frontend/src/components/screens/match_screen.vue:93-99` (disabled states ignore dialogs), `frontend/src/components/screens/match_screen.vue:470-472` (PLAY handler ignores open dialogs), `frontend/src/components/pause_dialog.vue:44-56`, `frontend/src/components/confirm_dialog.vue:54-66` (no focus move, focus trap or `inert`).
-- **Severity:** Low
-- **Confidence:** High
-- **Likelihood:** Low. Only keyboard and screen-reader users can reach the controls behind the backdrop; pointer input is blocked.
-- **Defect:** The dialogs are plain overlays. Focus stays where it was, nothing traps it, and the match is not made inert. The card and PLAY handlers don't check whether a dialog is open.
-  - Selecting a card while paused scores it with the stage clock frozen and plays the win or fail sound behind the dialog. It also schedules the stage advance, so the next stage, or the results screen, loads behind the still-open pause dialog.
-  - Pressing PLAY while paused plays the clip behind the dialog without starting the clock. A user can listen to the whole clip, resume, and answer at once for full points.
-- **Trigger:** In Chrome or Firefox, press the pause button (focus stays on it), press Shift+Tab to reach PLAY or a card, then press Enter. The same works after browser Back opens the pause dialog while a card has focus.
-- **Evidence / verification:** Traced: `isCardDisabled` and `handleCardClick` never read `isDialogOpen`. `scheduleStageAdvance` runs regardless. `startStageClock` records a started-but-frozen clock while a dialog is open (`match_screen.vue:317-323`), and `getStageElapsedSeconds` excludes frozen time. The dialogs only add an Escape listener on `window`. The independent refutation pass confirmed this (cards are visually blurred behind the dialog).
-- **Suggested fix:** Make the match content `inert` (or `aria-hidden` plus a focus trap) while a dialog is open, move focus into the dialog on open and restore it on close. Also guard `handleCardClick` and `handlePlayClick` with the dialog-open check.
 
 ### [b/resource-and-configuration-parity/routing/unmatched-path-renders-blank] Unknown paths, including `/index.html`, render an empty page with no way home
 
@@ -90,20 +41,6 @@
 - **Trigger:** Deploy a new build, then open a bookmarked `/match?...` URL in a browser that loaded the site in the last hour. For the harmful variant: a stale page requests an asset the new release removed, then the old release is rolled back.
 - **Evidence / verification:** Read the Hosting emulator code bundled with the installed firebase-tools (superstatic 10.0.0). Its middleware order is headers → files → rewrites, and the headers middleware matches the original request pathname. Production behavior is assumed to match. Hosting's default `Cache-Control` could not be checked without contacting the live site. The independent refutation pass agreed with the mechanism and downgraded the usual impact to "previous build served", hence Low confidence.
 - **Suggested fix:** Apply `no-cache` to every HTML response. For example, set a `no-cache` rule on `**` first and keep the immutable rule for `/assets/**` after it, since later matching rules override earlier ones. Also exclude `/assets/**` from the catch-all rewrite, so a missing asset returns a real 404 that is not cached as immutable.
-
-### [b/validation-and-coercion/catalogue-fetch/missing-id-and-url-validation] Catalogue validation accepts duplicate ids, unplayable URLs and too-small catalogues
-
-- **Location:** `frontend/scripts/fetch_memes.sh:22-29` (type checks only). Related: `frontend/src/services/meme_catalogue.ts:40-44` (the runtime check is only an array check), `frontend/src/components/screens/match_screen.vue:691-701` (cards keyed and highlighted by id), `frontend/src/services/youtube.ts:10-38`, `frontend/src/constants.ts:19-23`.
-- **Severity:** Low
-- **Confidence:** Low
-- **Likelihood:** Low. It needs a bad row in the upstream sheet. The catalogue is re-fetched on every `npm run deploy`, and the current 46 entries are clean.
-- **Defect:** The deploy-time check only requires a non-empty array of items with a numeric id and string name and url, and the app re-checks only that the data is an array. Catalogues that break gameplay still ship:
-  - Duplicate ids: two decoys sharing an id collide on the card key and thumbnail map, so one card shows the other's thumbnail and both highlight when either is picked.
-  - A URL with no extractable YouTube id: that stage has no audio, unlocks immediately with the clock running, and shows a broken image.
-  - Fewer than 6 entries: hard mode shows fewer cards than designed.
-- **Trigger:** A sheet edit that duplicates an id, pastes a non-YouTube or malformed link, or leaves fewer than 6 rows, followed by `npm run deploy`.
-- **Evidence / verification:** Traced the validation script and the consumers. `pickStageMemes` keys answers and decoys by id. `getYouTubeThumbnailUrl` and `extractYouTubeVideoId` return null for unparseable URLs, which leads to an empty image source and the audio-unavailable path. The refutation pass corrected an earlier claim: duplicate ids cannot cause a wrong answer to be accepted, because memes sharing the target's id are excluded from its decoys. Whether the sheet can produce such rows (manual ids or URLs) is unknown.
-- **Suggested fix:** In the validation step, also reject duplicate ids, URLs from which an 11-character YouTube id cannot be extracted, and catalogues smaller than the largest card count. Mirror at least the id-uniqueness and URL checks at runtime, or fail the build.
 
 ### [a/concurrency/match-audio/ended-clip-replayed-on-resume] A clip that ends just as the user pauses replays from the start on resume
 

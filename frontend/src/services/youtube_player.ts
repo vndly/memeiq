@@ -6,6 +6,9 @@ import type {YouTubeNamespace,
 
 let apiPromise: Promise<YouTubeNamespace> | null = null
 
+/** Milliseconds a mounted player may take to report ready before it is treated as failed. */
+const PLAYER_READY_TIMEOUT_MS = 15000
+
 /**
  * Loads the YouTube IFrame API script and resolves when the global YT namespace is ready.
  * @returns Resolves with the YouTube namespace.
@@ -115,6 +118,7 @@ export class YouTubeAudioPlayer {
   private callbacks: YouTubeAudioPlayerCallbacks
   private hostElement: HTMLElement | null = null
   private mountGeneration: number = 0
+  private readyTimeoutId: ReturnType<typeof setTimeout> | null = null
 
   /**
    * Constructs a new audio player instance.
@@ -128,6 +132,7 @@ export class YouTubeAudioPlayer {
     this.isPlaybackActive = false // Whether playback was requested and has not been paused, stopped, or ended
     this.hostElement = null // Host container element
     this.mountGeneration = 0 // Generation counter to guard async mount
+    this.readyTimeoutId = null // Pending timeout that fails a player that never reports ready
   }
 
   /**
@@ -196,6 +201,15 @@ export class YouTubeAudioPlayer {
           },
         },
       })
+
+      // A player whose iframe never loads reports neither ready nor error, so give up on it after a while
+      this.readyTimeoutId = setTimeout(() => {
+        this.readyTimeoutId = null
+        if (this.mountGeneration === currentGeneration) {
+          this.destroy()
+          this.callbacks.onError()
+        }
+      }, PLAYER_READY_TIMEOUT_MS)
     } catch {
       if (this.mountGeneration === currentGeneration) {
         this.callbacks.onError()
@@ -263,6 +277,7 @@ export class YouTubeAudioPlayer {
    */
   destroy(): void {
     this.mountGeneration++
+    this.clearReadyTimeout()
     this.pendingPlay = false
     this.isPlaybackActive = false
     this.isPlayerReady = false
@@ -285,6 +300,7 @@ export class YouTubeAudioPlayer {
    * @param _event - YouTube ready event.
    */
   private handleReady(_event: YouTubePlayerReadyEvent): void {
+    this.clearReadyTimeout()
     this.isPlayerReady = true
     if (this.callbacks.onReady !== undefined) {
       this.callbacks.onReady()
@@ -316,8 +332,19 @@ export class YouTubeAudioPlayer {
    * @param _event - YouTube player error event.
    */
   private handleError(_event: YouTubePlayerErrorEvent): void {
+    this.clearReadyTimeout()
     this.pendingPlay = false
     this.isPlaybackActive = false
     this.callbacks.onError()
+  }
+
+  /**
+   * Cancels the pending ready timeout, if any.
+   */
+  private clearReadyTimeout(): void {
+    if (this.readyTimeoutId !== null) {
+      clearTimeout(this.readyTimeoutId)
+      this.readyTimeoutId = null
+    }
   }
 }
