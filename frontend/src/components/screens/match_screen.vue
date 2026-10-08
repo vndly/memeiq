@@ -118,6 +118,7 @@ function startMatch(): void {
   if (memeCatalogue.value.length === 0) {
     return
   }
+  analytics.trackMatchStart(difficulty.value, matchLength.value)
   stageTargetMemes.value = shuffleMemes(memeCatalogue.value).slice(0, getMatchMemeCount(matchLength.value))
   stageIndex.value = 0
   correctAnswerCount.value = 0
@@ -580,6 +581,7 @@ function handleCancelLeave(): void {
   analytics.trackMatchStay()
   isConfirmOpen.value = false
   isPauseOpen.value = true
+  analytics.trackPauseDialogShown()
 }
 
 /**

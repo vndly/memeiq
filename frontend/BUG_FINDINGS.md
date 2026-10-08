@@ -1,14 +1,3 @@
-### [a/logic-errors/analytics/match-start-and-pause-events-skipped] `match_start` and `pause_dialog_shown` analytics events are skipped on some paths
-
-- **Location:** `frontend/src/components/screens/match_screen.vue:567-571` (STAY reopens the pause dialog without logging). Related: `frontend/src/components/screens/main_screen.vue:55` (the only `match_start` call), `frontend/src/components/screens/match_screen.vue:594-596` (every mount starts a match), `frontend/src/services/analytics.ts:77-100`.
-- **Severity:** Low
-- **Confidence:** High
-- **Likelihood:** Medium. Matches started by reloading `/match` or by Back into `/match` (which the back-navigation finding makes routine) all go unlogged, as does every STAY.
-- **Defect:** `match_start` is documented as "when a player starts a new match" but is logged only from the START button. A match started by a reload or deep link of `/match`, or by Back into `/match`, logs nothing. `pause_dialog_shown` is documented as "when the pause dialog is displayed", but STAY on the leave confirmation redisplays the pause dialog without logging it. Match and pause metrics are therefore undercounted.
-- **Trigger:** Reload during a match, or press Back from home into `/match`: a new match runs with no `match_start`. Or open pause → QUIT → STAY: the pause dialog shows again with no `pause_dialog_shown`.
-- **Evidence / verification:** Traced: `trackMatchStart` is called only in `handleStartClick` (`main_screen.vue:55`), while `startMatch` runs from `onMounted` on every mount (`match_screen.vue:594-596`). `handleCancelLeave` sets `isPauseOpen = true` without calling `trackPauseDialogShown` (`match_screen.vue:567-571`). The refutation pass confirmed both.
-- **Suggested fix:** Log `match_start` from the match screen's `startMatch` with the resolved difficulty and length, and remove the menu-side call. Log `pause_dialog_shown` from `handleCancelLeave` too, or wherever the pause dialog's open flag becomes true.
-
 ### [b/resource-and-configuration-parity/routing/unmatched-path-renders-blank] Unknown paths, including `/index.html`, render an empty page with no way home
 
 - **Location:** `frontend/src/router.ts:11-22` (only `/` and `/match`, no catch-all). Related: `frontend/src/app.vue:12-13`, `backend/firebase.json:12-17` and `backend/firebase.json:37-45` (`/index.html` is served as a real file and given its own header rule).

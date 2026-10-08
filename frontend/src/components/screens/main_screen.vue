@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import {computed, ref} from 'vue'
 import {useRouter} from 'vue-router'
-import {analytics} from '@/services/analytics'
 import {getMatchMemeCount} from '@/services/meme_catalogue'
 import {playButtonSound} from '@/services/sound_effects'
 import type {Difficulty} from '@/types/difficulty'
@@ -54,7 +53,6 @@ const matchLengthOptions = computed<MatchLengthOption[]>(() => {
  */
 function handleStartClick(): void {
   playButtonSound()
-  analytics.trackMatchStart(selectedDifficulty.value, selectedMatchLength.value)
   void router.push({
     name: 'match',
     query: {
