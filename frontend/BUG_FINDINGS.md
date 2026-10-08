@@ -1,14 +1,3 @@
-### [a/error-handling/match-stage/manual-play-assumed-successful] PLAY marks the audio as played before playback starts and can't be retried
-
-- **Location:** `frontend/src/components/screens/match_screen.vue:475-477` (pressed flag, audio-played flag and clock set before any PLAYING event). Related: `frontend/src/components/screens/match_screen.vue:93-99` (cards unlock and PLAY disables on those flags), `frontend/src/components/screens/match_screen.vue:424-430` (the real PLAYING callback), `frontend/src/services/youtube_player.ts:205-213`.
-- **Severity:** Medium
-- **Confidence:** Low
-- **Likelihood:** Low. PLAY is reached only when autoplay was blocked. The defect shows only if the tap-triggered `playVideo()`, sent by postMessage to the cross-origin, off-screen iframe, also fails to start playback.
-- **Defect:** The PLAY handler sets the audio-played flag and the pressed flag and starts the penalty clock, then asks the player to play. It never checks that a PLAYING event follows. If playback does not start, the cards unlock, the clock runs, and PLAY stays disabled for the rest of the stage. The user must guess blind, with no retry and no indication that audio failed.
-- **Trigger:** A browser that blocks both autoplay and scripted playback in the cross-origin embed. YouTube's IFrame API documentation warns that scripted playback functions may not work in some mobile browsers unless the user taps the player itself. The player here is hidden off-screen.
-- **Evidence / verification:** Traced: `handlePlayClick` sets `isPlayButtonPressed`, `hasAudioPlayed` and calls `startStageClock()` before `audioPlayer.play()`. The only paths that reset these flags are a new stage's `loadStage`. An independent refutation pass confirmed the path. Remaining assumptions (unverified, no device testing): whether a target browser, most plausibly iOS Safari, actually blocks the tap-delegated `playVideo()`. Chrome likely allows it through the iframe's autoplay delegation and the page's sticky user activation.
-- **Suggested fix:** Set the audio-played flag only in the PLAYING callback. After PLAY, keep the button re-enabled, or re-enable it after a short timeout, until PLAYING arrives. If it never does, fall back to the audio-unavailable path explicitly.
-
 ### [a/logic-errors/analytics/match-start-and-pause-events-skipped] `match_start` and `pause_dialog_shown` analytics events are skipped on some paths
 
 - **Location:** `frontend/src/components/screens/match_screen.vue:567-571` (STAY reopens the pause dialog without logging). Related: `frontend/src/components/screens/main_screen.vue:55` (the only `match_start` call), `frontend/src/components/screens/match_screen.vue:594-596` (every mount starts a match), `frontend/src/services/analytics.ts:77-100`.

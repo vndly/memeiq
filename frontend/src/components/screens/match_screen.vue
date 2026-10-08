@@ -294,7 +294,7 @@ function clearResetTimeout(): void {
 }
 
 /**
- * Cancels the pending check for blocked autoplay.
+ * Cancels the pending check for blocked playback.
  */
 function clearAutoplayCheckTimeout(): void {
   if (autoplayCheckTimeoutId !== null) {
@@ -467,6 +467,7 @@ function autoplayAudio(): void {
 
 /**
  * Plays the meme audio once after the browser blocked autoplay.
+ * If the audio has not started shortly after, the cards unlock without it and the play button is re-enabled for a retry.
  */
 function handlePlayClick(): void {
   if (isPlayButtonDisabled.value || activeMeme.value === null || audioPlayer === null) {
@@ -475,14 +476,22 @@ function handlePlayClick(): void {
 
   playButtonSound()
   isPlayButtonPressed.value = true
-  hasAudioPlayed.value = true
-  startStageClock()
   const videoId = extractYouTubeVideoId(activeMeme.value.url) ?? undefined
   analytics.trackAudioPlay({
     videoId: videoId,
     videoName: activeMeme.value.name,
   })
   audioPlayer.play()
+
+  clearAutoplayCheckTimeout()
+  autoplayCheckTimeoutId = setTimeout(() => {
+    autoplayCheckTimeoutId = null
+    if (!hasAudioPlayed.value) {
+      isPlayButtonPressed.value = false
+      isAudioUnavailable.value = true
+      startStageClock()
+    }
+  }, AUTOPLAY_CHECK_DELAY_MS)
 }
 
 /**
