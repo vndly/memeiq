@@ -1,19 +1,3 @@
-### [a/error-handling/youtube-api-loader/failed-script-tag-never-reinjected] A failed YouTube API script tag blocks every later load, so each later stage waits 10 s and never gets audio
-
-- **Location:** `frontend/src/services/youtube_player.ts:42` (an existing script tag suppresses injection). Related: `frontend/src/services/youtube_player.ts:47-51` (the error handler leaves the tag in `<head>`), `frontend/src/services/youtube_player.ts:75-79` (10 s timeout), `frontend/src/services/youtube_player.ts:185-189` (mount failure → error callback), `frontend/src/components/screens/match_screen.vue:416-423`.
-- **Severity:** Medium
-- **Confidence:** High
-- **Likelihood:** Low. It needs `https://www.youtube.com/iframe_api` to fail once (a network blip at match start, a filter or blocker on that URL). After that it is deterministic for the rest of the session.
-- **Defect:** On a script load error, the loader clears its cached promise and rejects, but leaves the failed `<script>` element in the document. Every later call finds that element with `querySelector`, injects nothing, polls for a `YT` global that never appears, and rejects after the full 10 s timeout. Each later stage shows the loading spinner for 10 s and then reveals with no audio. This lasts for every stage and every later match until a full reload, even after the network recovers. A 46-meme match spends about 7.5 minutes on spinners. Every attempt also wraps `window.onYouTubeIframeAPIReady` again, so the handler chain keeps growing.
-- **Trigger:** Start a match while `www.youtube.com` is briefly unreachable (offline for a moment, flaky mobile data) or while the script is blocked. Then continue playing.
-- **Evidence / verification:** Reproduced with an isolated scratch test that imports `youtube_player.ts` from a disposable copy of `HEAD` and uses a minimal fake DOM:
-  - Attempt 1 appends one script; firing its `onerror` rejects with "Failed to load YouTube IFrame API script".
-  - Attempt 2 appends no new script (count stays 1) and rejects with "Timed out waiting for YouTube IFrame API" only once the timeout fires.
-
-  An independent refutation pass confirmed the path. The stage clock is reset during loading, so the cost is delay and missing audio, not score.
-
-- **Suggested fix:** In the script `onerror` handler, remove the failed element (and restore the previous ready handler) before rejecting, so the next call injects a fresh script. Optionally, give up after a few failed stages instead of waiting the full timeout every time.
-
 ### [a/error-handling/match-stage/player-ready-wait-unbounded] A stage spins forever when the YouTube embed never reports ready or failed
 
 - **Location:** `frontend/src/components/screens/match_screen.vue:162` (stage reveal waits on thumbnails and audio with no timeout). Related: `frontend/src/components/screens/match_screen.vue:232-247` (the audio load resolves only from player callbacks), `frontend/src/components/screens/match_screen.vue:409-445`, `frontend/src/services/youtube_player.ts:156-184` (only onReady and onError settle a mounted player).

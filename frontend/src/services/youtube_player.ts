@@ -24,9 +24,11 @@ export function loadYouTubeIframeApi(): Promise<YouTubeNamespace> {
     return apiPromise
   }
 
-  apiPromise = new Promise<YouTubeNamespace>((resolve, reject) => {
+  const promise = new Promise<YouTubeNamespace>((resolve, reject) => {
     let timerId: ReturnType<typeof setInterval> | null = null
     let timeoutId: ReturnType<typeof setTimeout> | null = null
+    let isFailed = false
+    const previousReadyHandler = window.onYouTubeIframeAPIReady
 
     const cleanup = (): void => {
       if (timerId !== null) {
@@ -39,20 +41,33 @@ export function loadYouTubeIframeApi(): Promise<YouTubeNamespace> {
       }
     }
 
+    const fail = (message: string): void => {
+      // A script error can arrive after the timeout already failed this attempt and a newer one has started
+      if (isFailed) {
+        return
+      }
+      isFailed = true
+      cleanup()
+      window.onYouTubeIframeAPIReady = previousReadyHandler
+      if (apiPromise === promise) {
+        apiPromise = null
+      }
+      reject(new Error(message))
+    }
+
     const existingScript = document.querySelector<HTMLScriptElement>('script[src="https://www.youtube.com/iframe_api"]')
     if (existingScript === null) {
       const scriptElement = document.createElement('script')
       scriptElement.src = 'https://www.youtube.com/iframe_api'
       scriptElement.async = true
       scriptElement.onerror = (): void => {
-        cleanup()
-        apiPromise = null
-        reject(new Error('Failed to load YouTube IFrame API script'))
+        // Remove the failed tag so the next attempt injects a fresh one instead of waiting on this one
+        scriptElement.remove()
+        fail('Failed to load YouTube IFrame API script')
       }
       document.head.appendChild(scriptElement)
     }
 
-    const previousReadyHandler = window.onYouTubeIframeAPIReady
     window.onYouTubeIframeAPIReady = () => {
       if (previousReadyHandler !== undefined) {
         previousReadyHandler()
@@ -73,13 +88,12 @@ export function loadYouTubeIframeApi(): Promise<YouTubeNamespace> {
     }, 50)
 
     timeoutId = setTimeout(() => {
-      cleanup()
-      apiPromise = null
-      reject(new Error('Timed out waiting for YouTube IFrame API'))
+      fail('Timed out waiting for YouTube IFrame API')
     }, 10000)
   })
 
-  return apiPromise
+  apiPromise = promise
+  return promise
 }
 
 export interface YouTubeAudioPlayerCallbacks {
