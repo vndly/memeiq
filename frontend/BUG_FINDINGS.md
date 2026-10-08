@@ -1,14 +1,3 @@
-### [a/null-and-numeric-hazards/match-results/iq-count-up-negative-progress] The results IQ count-up can show a negative number for one frame
-
-- **Location:** `frontend/src/components/screens/match_screen.vue:207-211` (progress not clamped at 0). Related: `frontend/src/components/screens/match_screen.vue:182-190`.
-- **Severity:** Low
-- **Confidence:** Medium
-- **Likelihood:** Low. It needs the first animation frame's timestamp to be earlier than the `performance.now()` taken in the timer task, by enough to round below zero. That is about 2 ms at an IQ of 100, or about 16 ms to show -6 at 150.
-- **Defect:** The count-up computes progress as `(timestamp - startTime) / duration` and clamps only the upper bound. Browsers pass the animation callback the frame's start time, which can be earlier than the start time recorded in the reset-timeout task. The progress is then negative, the cubic ease turns it more negative, and the first frame shows a negative IQ such as "-1" to "-6".
-- **Trigger:** Finish a match with a good score in a browser that passes a frame time earlier than the scheduling task, such as Chrome.
-- **Evidence / verification:** Traced: `startTime = performance.now()`, then `progress = Math.min(1, (timestamp - startTime) / 1200)`, then `1 - (1 - progress) ** 3`, then `Math.round(finalScore * easedProgress)`, with no lower clamp. The refutation pass confirmed the arithmetic and the browser timing behavior; `Math.round` of values between -0.5 and 0 renders as "0".
-- **Suggested fix:** Clamp the progress at both ends, `Math.min(1, Math.max(0, …))`, or take the start time from the first animation frame's timestamp.
-
 ### [a/state-and-lifecycle/match-leave-guard/query-change-restarts-without-confirmation] Moving between two `/match` history entries restarts the match without confirmation
 
 - **Location:** `frontend/src/components/screens/match_screen.vue:610-619` (restart on difficulty/length change). Related: `frontend/src/components/screens/match_screen.vue:582-592` (only a leave guard is registered).

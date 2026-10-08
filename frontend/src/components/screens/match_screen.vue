@@ -208,7 +208,7 @@ function startIqCountUp(): void {
 
   const startTime = performance.now()
   const renderCountUpFrame = (timestamp: number): void => {
-    const progress = Math.min(1, (timestamp - startTime) / IQ_COUNT_UP_DURATION_MS)
+    const progress = Math.min(1, Math.max(0, (timestamp - startTime) / IQ_COUNT_UP_DURATION_MS))
     const easedProgress = 1 - (1 - progress) ** 3
     displayedIqScore.value = Math.round(finalScore * easedProgress)
     iqCountUpFrameId = progress < 1 ? requestAnimationFrame(renderCountUpFrame) : null
