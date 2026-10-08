@@ -1,14 +1,3 @@
-### [b/resource-and-configuration-parity/routing/unmatched-path-renders-blank] Unknown paths, including `/index.html`, render an empty page with no way home
-
-- **Location:** `frontend/src/router.ts:11-22` (only `/` and `/match`, no catch-all). Related: `frontend/src/app.vue:12-13`, `backend/firebase.json:12-17` and `backend/firebase.json:37-45` (`/index.html` is served as a real file and given its own header rule).
-- **Severity:** Low
-- **Confidence:** High
-- **Likelihood:** Low. Nothing in the app links to such paths. It needs a mistyped, outdated or hand-edited URL, or a direct `/index.html` link.
-- **Defect:** Hosting answers every path with the app. The router has no fallback route, so for any path other than `/` and `/match` the router view renders nothing once the catalogue loads. The user sees only the blue body background, with no content, message or link home.
-- **Trigger:** Open `https://<site>/index.html` or any other unknown path such as `/play`.
-- **Evidence / verification:** Traced: with no matched record, `RouterView` falls back to its empty default slot (`frontend/node_modules/vue-router/dist/vue-router.js:1093-1094`). `createWebHistory` does not strip `index.html`. Confirmed independently. `/match/` and `/Match` still match, because routes are case-insensitive and non-strict.
-- **Suggested fix:** Add a catch-all route, `{path: '/:pathMatch(.*)*', redirect: {name: 'home'}}`.
-
 ### [b/resource-and-configuration-parity/hosting/cache-headers-keyed-to-request-path] Hosting cache rules don't follow the rewritten index.html: SPA routes are cacheable and missing assets get HTML cached for a year
 
 - **Location:** `backend/firebase.json:28-46` (`no-cache` only for `/` and `/index.html`). Related: `backend/firebase.json:12-27` (catch-all rewrite plus the immutable `/assets/**` rule).

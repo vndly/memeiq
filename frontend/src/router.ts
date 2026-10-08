@@ -19,6 +19,12 @@ const router = createRouter({
       name: 'match',
       component: MatchScreen,
     },
+    {
+      path: '/:pathMatch(.*)*',
+      redirect: {
+        name: 'home',
+      },
+    },
   ],
 })
 
