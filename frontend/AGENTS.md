@@ -39,6 +39,6 @@ Meme IQ (Vite + Vue 3, TypeScript, Composition API with `<script setup>`, ESLint
 ## Deployment
 
 - **Build output**: `npm run build` writes into `../backend/public` (the directory Firebase Hosting serves) and empties it first (`emptyOutDir: true`).
-- **Hosting configuration**: `../backend/firebase.json` rewrites all paths to `/index.html`, serves `/assets/**` as immutable (1-year cache), and serves `/` and `/index.html` with `no-cache`.
+- **Hosting configuration**: `../backend/firebase.json` rewrites all paths to `/index.html`, serves every path with `no-cache` (header rules match the request path before rewrites, so this covers the `index.html` served for SPA routes), then overrides `/assets/**` as immutable (1-year cache); later matching header rules win.
 - **Deploy scripts**: `npm run deploy` (or `scripts/deploy.sh`) updates the meme catalogue (`scripts/fetch_memes.sh`), builds the frontend, switches to remote target (`firebase use remote`), deploys hosting (`firebase deploy --only hosting`), and resets to `local` (`firebase use local`). `../backend/scripts/deploy.sh` also triggers `npm run build` before publishing. Deploy scripts pass `--only hosting` and do not deploy Firestore indexes; run `firebase deploy --only firestore:indexes` from `../backend` when `firestore.indexes.json` changes.
 - **Firebase**: Web config lives in `src/firebase.ts` (project `meme-iq`) and is public by design — it is a set of identifiers, not secrets. The project requires the Anonymous sign-in provider enabled in Firebase Auth to prevent `auth/configuration-not-found`.
