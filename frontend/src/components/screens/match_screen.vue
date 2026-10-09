@@ -935,18 +935,22 @@ watch(
 .stage-counter {
   grid-row: 1;
   align-self: start;
+  /* Mirrors the pause button in the opposite corner */
+  justify-self: start;
   display: flex;
   align-items: center;
   min-height: var(--button-height);
+  padding: 0 0.75rem;
   font-family: var(--font-display);
-  font-size: var(--counter-size);
+  font-size: 1.5rem;
   line-height: 1;
   letter-spacing: 0.04em;
-  color: var(--text-main);
+  color: var(--ink);
   font-variant-numeric: tabular-nums;
-  -webkit-text-stroke: 5px var(--ink);
-  paint-order: stroke fill;
-  text-shadow: 0 3px 0 var(--ink);
+  background: var(--paper);
+  border: 3px solid var(--ink);
+  border-radius: 12px;
+  box-shadow: 0 4px 0 var(--ink);
 }
 
 .stage-loading {
@@ -1395,6 +1399,12 @@ watch(
 
   .play-button {
     align-self: start;
+  }
+
+  .stage-counter {
+    --button-height: 48px;
+    padding: 0 1rem;
+    font-size: 1.875rem;
   }
 
   .pause-button {
