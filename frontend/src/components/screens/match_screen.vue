@@ -80,8 +80,8 @@ const isAudioUnavailable = ref(false)
 const playerHostElement = ref<HTMLElement | null>(null)
 const clickedMemeId = ref<number | null>(null)
 const hasAudioPlayed = ref(false)
-const isPlayButtonVisible = ref(false)
-const isPlayButtonPressed = ref(false)
+const isAudioStarting = ref(false)
+const isAudioPlaying = ref(false)
 const displayedIqScore = ref(0)
 
 const winAudio = typeof Audio !== 'undefined' ? new Audio(winAudioUrl) : null
@@ -116,7 +116,7 @@ const isCardDisabled = computed(() => {
 })
 
 const isPlayButtonDisabled = computed(() => {
-  return isPlayButtonPressed.value || clickedMemeId.value !== null || !isPlayerReady.value
+  return isDialogOpen.value || isStageLoading.value || isAudioStarting.value || isAudioPlaying.value || clickedMemeId.value !== null || !isPlayerReady.value
 })
 
 const isDialogOpen = computed(() => {
@@ -163,8 +163,8 @@ async function loadStage(): Promise<void> {
   clickedMemeId.value = null
   hasAudioPlayed.value = false
   isAudioUnavailable.value = false
-  isPlayButtonVisible.value = false
-  isPlayButtonPressed.value = false
+  isAudioStarting.value = false
+  isAudioPlaying.value = false
   resetStageClock()
   clearResetTimeout()
   clearAutoplayCheckTimeout()
@@ -438,8 +438,9 @@ function setupAudioPlayer(): void {
   if (audioPlayer === null) {
     audioPlayer = new YouTubeAudioPlayer({
       onEnded: (): void => {
-        // Audio is played once per stage; a clip that ends just as the pause dialog opens must not replay on resume
+        // A clip that ends just as the pause dialog opens must not replay on resume
         isAudioPausedByDialog = false
+        isAudioPlaying.value = false
       },
       onError: (): void => {
         isPlayerReady.value = false
@@ -452,9 +453,8 @@ function setupAudioPlayer(): void {
       onPlaying: (): void => {
         hasAudioPlayed.value = true
         startStageClock()
-        if (!isPlayButtonPressed.value) {
-          isPlayButtonVisible.value = false
-        }
+        isAudioStarting.value = false
+        isAudioPlaying.value = true
       },
       onReady: (): void => {
         isPlayerReady.value = true
@@ -474,27 +474,26 @@ function setupAudioPlayer(): void {
 
 /**
  * Starts the active meme's audio as soon as the stage is revealed.
- * Browsers may block it without a prior user gesture, so the play button is shown if the audio has not started shortly after.
+ * Browsers may block it without a prior user gesture, so the play button is re-enabled if the audio has not started shortly after.
  */
 function autoplayAudio(): void {
-  clearAutoplayCheckTimeout()
-  autoplayCheckTimeoutId = setTimeout(() => {
-    autoplayCheckTimeoutId = null
-    if (!hasAudioPlayed.value && !isAudioUnavailable.value) {
-      isPlayButtonVisible.value = true
-    }
-  }, AUTOPLAY_CHECK_DELAY_MS)
-
   if (isDialogOpen.value || !isPlayerReady.value || audioPlayer === null) {
     return
   }
 
+  isAudioStarting.value = true
   audioPlayer.play()
+
+  clearAutoplayCheckTimeout()
+  autoplayCheckTimeoutId = setTimeout(() => {
+    autoplayCheckTimeoutId = null
+    isAudioStarting.value = false
+  }, AUTOPLAY_CHECK_DELAY_MS)
 }
 
 /**
- * Plays the meme audio once after the browser blocked autoplay.
- * If the audio has not started shortly after, the cards unlock without it and the play button is re-enabled for a retry.
+ * Plays the meme audio from the beginning, to start it after the browser blocked autoplay or to replay it once it finished.
+ * The play button is re-enabled once the audio finishes, or shortly after if it does not start; in that case the cards unlock without it.
  */
 function handlePlayClick(): void {
   if (isPlayButtonDisabled.value || activeMeme.value === null || audioPlayer === null) {
@@ -502,7 +501,7 @@ function handlePlayClick(): void {
   }
 
   playButtonSound()
-  isPlayButtonPressed.value = true
+  isAudioStarting.value = true
   const videoId = extractYouTubeVideoId(activeMeme.value.url) ?? undefined
   analytics.trackAudioPlay({
     videoId: videoId,
@@ -513,8 +512,8 @@ function handlePlayClick(): void {
   clearAutoplayCheckTimeout()
   autoplayCheckTimeoutId = setTimeout(() => {
     autoplayCheckTimeoutId = null
+    isAudioStarting.value = false
     if (!hasAudioPlayed.value) {
-      isPlayButtonPressed.value = false
       isAudioUnavailable.value = true
       startStageClock()
     }
@@ -705,10 +704,7 @@ watch(
 </script>
 
 <template>
-  <main
-    class="match-screen"
-    :class="{'is-play-button-hidden': !isPlayButtonVisible}"
-  >
+  <main class="match-screen">
     <h1 class="visually-hidden">
       Match
     </h1>
@@ -766,83 +762,17 @@ watch(
     </div>
 
     <template v-else>
-      <p
-        v-if="stageCount > 0"
-        class="stage-counter"
-      >
-        <span class="visually-hidden">Stage </span>{{ stageNumber }}/{{ stageCount }}
-      </p>
-
-      <div
-        v-if="isStageLoading"
-        class="stage-loading"
-      >
-        <LoadingSpinner label="Loading stage" />
-      </div>
-
-      <template v-else>
-        <div
-          class="thumbnails"
-          :class="`thumbnails--${difficulty}`"
+      <header class="stage-header">
+        <p
+          v-if="stageCount > 0"
+          class="stage-counter"
         >
-          <button
-            v-for="meme in selectedMemes"
-            :key="meme.id"
-            type="button"
-            class="card"
-            :class="{
-              'is-correct': clickedMemeId === meme.id && meme.id === activeMeme?.id,
-              'is-incorrect': clickedMemeId === meme.id && meme.id !== activeMeme?.id,
-            }"
-            :disabled="isCardDisabled"
-            @click="handleCardClick(meme)"
-          >
-            <img
-              :src="getCardImageUrl(meme)"
-              :alt="meme.name"
-              class="thumbnail-image"
-              width="320"
-              height="180"
-              loading="eager"
-            >
-            <div
-              v-if="clickedMemeId === meme.id"
-              class="feedback-overlay"
-              aria-hidden="true"
-            >
-              <svg
-                v-if="meme.id === activeMeme?.id"
-                class="feedback-icon is-correct"
-                viewBox="-5 -5 34 34"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="3.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              <svg
-                v-else
-                class="feedback-icon is-incorrect"
-                viewBox="-5 -5 34 34"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="3.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </div>
-          </button>
-        </div>
+          <span class="visually-hidden">Stage </span>{{ stageNumber }}/{{ stageCount }}
+        </p>
 
         <button
           type="button"
           class="action-button play-button"
-          :class="{'is-hidden': !isPlayButtonVisible}"
           :disabled="isPlayButtonDisabled"
           @click="handlePlayClick"
         >
@@ -856,24 +786,90 @@ watch(
           </svg>
           PLAY
         </button>
-      </template>
 
-      <button
-        type="button"
-        class="pause-button"
-        aria-label="Pause"
-        @click="handlePauseClick"
-      >
-        <svg
-          class="pause-icon"
-          viewBox="0 0 24 24"
-          fill="currentColor"
-          aria-hidden="true"
+        <button
+          type="button"
+          class="pause-button"
+          aria-label="Pause"
+          @click="handlePauseClick"
         >
-          <rect x="6" y="5" width="4" height="14" rx="1" />
-          <rect x="14" y="5" width="4" height="14" rx="1" />
-        </svg>
-      </button>
+          <svg
+            class="pause-icon"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <rect x="6" y="5" width="4" height="14" rx="1" />
+            <rect x="14" y="5" width="4" height="14" rx="1" />
+          </svg>
+        </button>
+      </header>
+
+      <div
+        v-if="isStageLoading"
+        class="stage-loading"
+      >
+        <LoadingSpinner label="Loading stage" />
+      </div>
+
+      <div
+        v-else
+        class="thumbnails"
+        :class="`thumbnails--${difficulty}`"
+      >
+        <button
+          v-for="meme in selectedMemes"
+          :key="meme.id"
+          type="button"
+          class="card"
+          :class="{
+            'is-correct': clickedMemeId === meme.id && meme.id === activeMeme?.id,
+            'is-incorrect': clickedMemeId === meme.id && meme.id !== activeMeme?.id,
+          }"
+          :disabled="isCardDisabled"
+          @click="handleCardClick(meme)"
+        >
+          <img
+            :src="getCardImageUrl(meme)"
+            :alt="meme.name"
+            class="thumbnail-image"
+            width="320"
+            height="180"
+            loading="eager"
+          >
+          <div
+            v-if="clickedMemeId === meme.id"
+            class="feedback-overlay"
+            aria-hidden="true"
+          >
+            <svg
+              v-if="meme.id === activeMeme?.id"
+              class="feedback-icon is-correct"
+              viewBox="-5 -5 34 34"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="3.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+            <svg
+              v-else
+              class="feedback-icon is-incorrect"
+              viewBox="-5 -5 34 34"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="3.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </div>
+        </button>
+      </div>
     </template>
 
     <PauseDialog
@@ -902,8 +898,8 @@ watch(
 
   position: relative;
   display: grid;
-  /* Cards take all the height left between the counter and the play button */
-  grid-template-rows: minmax(var(--button-height), auto) minmax(0, 1fr) minmax(var(--button-height), auto);
+  /* Cards take all the height left below the header */
+  grid-template-rows: minmax(var(--button-height), auto) minmax(0, 1fr);
   grid-template-columns: 100%;
   justify-items: center;
   row-gap: var(--stage-gap);
@@ -932,10 +928,21 @@ watch(
   border-width: 0;
 }
 
-.stage-counter {
+.stage-header {
   grid-row: 1;
   align-self: start;
-  /* Mirrors the pause button in the opposite corner */
+  position: relative;
+  z-index: 1;
+  display: grid;
+  /* Equal side columns keep the play button centered while the counter's width changes */
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  column-gap: 0.75rem;
+  width: 100%;
+}
+
+.stage-counter {
+  grid-column: 1;
   justify-self: start;
   display: flex;
   align-items: center;
@@ -1092,7 +1099,7 @@ watch(
 
 .thumbnails {
   --mobile-card-gap: 0.75rem;
-  /* Cards are sized from the height this container gets, so they grow when the play button is not shown */
+  /* Cards are sized from the height this container gets */
   container-type: size;
   grid-row: 2;
   display: grid;
@@ -1274,30 +1281,16 @@ watch(
 }
 
 .play-button {
-  grid-row: 3;
-  align-self: end;
-}
-
-.action-button.is-hidden {
-  visibility: hidden;
-}
-
-@media (max-width: 767px) {
-  /* Without the play button, the cards use the space down to the bottom of the screen */
-  .match-screen.is-play-button-hidden {
-    grid-template-rows: minmax(var(--button-height), auto) minmax(0, 1fr);
-  }
-
-  .play-button.is-hidden {
-    display: none;
-  }
+  grid-column: 2;
+  min-width: 0;
+  min-height: var(--button-height);
+  padding: 0 1.25rem;
+  box-shadow: 0 4px 0 var(--ink);
 }
 
 .pause-button {
-  position: absolute;
-  top: var(--safe-top);
-  right: var(--safe-right);
-  z-index: 1;
+  grid-column: 3;
+  justify-self: end;
   display: grid;
   place-items: center;
   width: var(--button-height);
@@ -1398,7 +1391,8 @@ watch(
   }
 
   .play-button {
-    align-self: start;
+    min-height: 48px;
+    padding: 0 1.5rem;
   }
 
   .stage-counter {
@@ -1409,8 +1403,6 @@ watch(
 
   .pause-button {
     --button-height: 48px;
-    top: 1.5rem;
-    right: var(--card-gap);
   }
 }
 
