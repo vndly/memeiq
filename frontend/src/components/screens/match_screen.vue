@@ -500,7 +500,6 @@ function handlePlayClick(): void {
     return
   }
 
-  playButtonSound()
   isAudioStarting.value = true
   const videoId = extractYouTubeVideoId(activeMeme.value.url) ?? undefined
   analytics.trackAudioPlay({
