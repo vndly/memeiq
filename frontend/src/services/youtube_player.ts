@@ -155,7 +155,7 @@ export class YouTubeAudioPlayer {
    * Mounts the YouTube player to a container element for a specific video ID.
    * @param container - Host DOM element for the iframe.
    * @param videoId - YouTube video ID to load.
-   * @param volume - Playback volume (0-100) for the video.
+   * @param volume - Playback volume (1-100) for the video.
    * @returns Resolves when the player instance is initialized.
    */
   async mount(container: HTMLElement, videoId: string, volume: number): Promise<void> {

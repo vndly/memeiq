@@ -23,7 +23,7 @@ for ((attempt = 1; attempt <= MAX_ATTEMPTS; attempt++)); do
         process.exit(1);
       }
       for (const item of data) {
-        if (typeof item.id !== "number" || typeof item.name !== "string" || typeof item.url !== "string" || typeof item.volume !== "number" || item.volume < 0 || item.volume > 100) {
+        if (typeof item.id !== "number" || typeof item.name !== "string" || typeof item.url !== "string" || typeof item.volume !== "number" || item.volume < 1 || item.volume > 100) {
           process.exit(1);
         }
       }
