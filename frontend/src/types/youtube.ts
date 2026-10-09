@@ -45,6 +45,7 @@ export interface YouTubePlayer {
   seekTo: (seconds: number, allowSeekAhead: boolean) => void
   destroy: () => void
   getPlayerState: () => number
+  setVolume: (volume: number) => void
   cueVideoById: (videoId: string) => void
   loadVideoById: (videoId: string) => void
 }

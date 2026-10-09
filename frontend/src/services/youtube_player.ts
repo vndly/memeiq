@@ -119,6 +119,7 @@ export class YouTubeAudioPlayer {
   private hostElement: HTMLElement | null = null
   private mountGeneration: number = 0
   private readyTimeoutId: ReturnType<typeof setTimeout> | null = null
+  private volume: number = 100
 
   /**
    * Constructs a new audio player instance.
@@ -133,6 +134,7 @@ export class YouTubeAudioPlayer {
     this.hostElement = null // Host container element
     this.mountGeneration = 0 // Generation counter to guard async mount
     this.readyTimeoutId = null // Pending timeout that fails a player that never reports ready
+    this.volume = 100 // Volume (0-100) applied when the player reports ready
   }
 
   /**
@@ -153,11 +155,13 @@ export class YouTubeAudioPlayer {
    * Mounts the YouTube player to a container element for a specific video ID.
    * @param container - Host DOM element for the iframe.
    * @param videoId - YouTube video ID to load.
+   * @param volume - Playback volume (0-100) for the video.
    * @returns Resolves when the player instance is initialized.
    */
-  async mount(container: HTMLElement, videoId: string): Promise<void> {
+  async mount(container: HTMLElement, videoId: string, volume: number): Promise<void> {
     this.destroy()
     this.hostElement = container
+    this.volume = volume
     this.isPlayerReady = false
     const currentGeneration = ++this.mountGeneration
 
@@ -297,10 +301,11 @@ export class YouTubeAudioPlayer {
 
   /**
    * Handles player ready event.
-   * @param _event - YouTube ready event.
+   * @param event - YouTube ready event.
    */
-  private handleReady(_event: YouTubePlayerReadyEvent): void {
+  private handleReady(event: YouTubePlayerReadyEvent): void {
     this.clearReadyTimeout()
+    event.target.setVolume(this.volume)
     this.isPlayerReady = true
     if (this.callbacks.onReady !== undefined) {
       this.callbacks.onReady()

@@ -463,9 +463,10 @@ function setupAudioPlayer(): void {
     })
   }
 
-  const videoId = activeMeme.value !== null ? extractYouTubeVideoId(activeMeme.value.url) : null
-  if (videoId !== null && playerHostElement.value !== null) {
-    void audioPlayer.mount(playerHostElement.value, videoId)
+  const meme = activeMeme.value
+  const videoId = meme !== null ? extractYouTubeVideoId(meme.url) : null
+  if (meme !== null && videoId !== null && playerHostElement.value !== null) {
+    void audioPlayer.mount(playerHostElement.value, videoId, meme.volume)
   } else {
     isAudioUnavailable.value = true
     settleAudioLoad()
