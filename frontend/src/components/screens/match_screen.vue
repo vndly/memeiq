@@ -1317,8 +1317,6 @@ watch(
   background: #b3b3b3;
   color: var(--ink);
   cursor: not-allowed;
-  transform: translateY(4px);
-  box-shadow: 0 1px 0 var(--ink);
   filter: none;
 }
 
