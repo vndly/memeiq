@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import LoadingSpinner from '@/components/loading_spinner.vue'
+import {analytics} from '@/services/analytics'
 import {catalogueError, fetchMemeCatalogue, isCatalogueLoading} from '@/services/meme_catalogue'
 import {playButtonSound} from '@/services/sound_effects'
 
@@ -8,6 +9,7 @@ import {playButtonSound} from '@/services/sound_effects'
  */
 function retryFetch(): void {
   playButtonSound()
+  analytics.trackCatalogueRetry()
   void fetchMemeCatalogue()
 }
 </script>

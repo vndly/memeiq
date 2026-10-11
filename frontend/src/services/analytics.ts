@@ -11,6 +11,32 @@ import type {MatchLength} from '@/types/match_length'
 export interface AudioPlayParams {
   videoId?: string
   videoName?: string
+  isReplay: boolean
+}
+
+/**
+ * Parameters for tracking a meme whose audio cannot be played.
+ */
+export interface AudioUnavailableParams {
+  videoId?: string
+  videoName?: string
+  reason: 'error' | 'not_started' | 'missing_video'
+}
+
+/**
+ * Parameters for tracking a meme whose autoplay did not start.
+ */
+export interface AutoplayBlockedParams {
+  videoId?: string
+  videoName?: string
+}
+
+/**
+ * Parameters for tracking a meme card whose thumbnail fails to download.
+ */
+export interface ThumbnailLoadFailureParams {
+  videoId?: string
+  videoName?: string
 }
 
 /**
@@ -22,6 +48,27 @@ export interface ThumbnailSelectParams {
   targetVideoId?: string
   targetVideoName?: string
   result: 'success' | 'failure'
+  stageNumber: number
+  answerSeconds: number
+}
+
+/**
+ * Parameters for tracking a completed match.
+ */
+export interface MatchCompleteParams {
+  difficulty: Difficulty
+  matchLength: MatchLength
+  iqScore: number
+  correctCount: number
+  stageCount: number
+}
+
+/**
+ * Parameters for tracking a match the player left before finishing.
+ */
+export interface MatchLeaveParams {
+  stageNumber: number
+  correctCount: number
 }
 
 /**
@@ -115,9 +162,13 @@ export class AnalyticsService {
 
   /**
    * Tracks when the player confirms leaving a match via the dialog.
+   * @param params - Stage reached and correct answers so far.
    */
-  trackMatchLeave(): void {
-    this.log('match_leave')
+  trackMatchLeave(params: MatchLeaveParams): void {
+    this.log('match_leave', {
+      stage_number: params.stageNumber,
+      correct_count: params.correctCount,
+    })
   }
 
   /**
@@ -129,10 +180,12 @@ export class AnalyticsService {
 
   /**
    * Tracks when the player initiates meme audio playback.
-   * @param params - Video identifier or name.
+   * @param params - Video identifier or name, and whether the audio already played in this stage.
    */
   trackAudioPlay(params: AudioPlayParams): void {
-    const payload: Record<string, string | number | boolean> = {}
+    const payload: Record<string, string | number | boolean> = {
+      is_replay: params.isReplay,
+    }
 
     if (params.videoId !== undefined) {
       payload.video_id = params.videoId
@@ -145,12 +198,67 @@ export class AnalyticsService {
   }
 
   /**
+   * Tracks when a meme's audio cannot be played and the cards unlock without it.
+   * @param params - Video identifier or name, and why the audio is unavailable.
+   */
+  trackAudioUnavailable(params: AudioUnavailableParams): void {
+    const payload: Record<string, string | number | boolean> = {
+      reason: params.reason,
+    }
+
+    if (params.videoId !== undefined) {
+      payload.video_id = params.videoId
+    }
+    if (params.videoName !== undefined) {
+      payload.video_name = params.videoName
+    }
+
+    this.log('audio_unavailable', payload)
+  }
+
+  /**
+   * Tracks when a stage's audio does not start on its own, so the player has to press play.
+   * @param params - Video identifier or name.
+   */
+  trackAutoplayBlocked(params: AutoplayBlockedParams): void {
+    const payload: Record<string, string | number | boolean> = {}
+
+    if (params.videoId !== undefined) {
+      payload.video_id = params.videoId
+    }
+    if (params.videoName !== undefined) {
+      payload.video_name = params.videoName
+    }
+
+    this.log('autoplay_blocked', payload)
+  }
+
+  /**
+   * Tracks when a meme card's thumbnail fails to download.
+   * @param params - Video identifier or name.
+   */
+  trackThumbnailLoadFailure(params: ThumbnailLoadFailureParams): void {
+    const payload: Record<string, string | number | boolean> = {}
+
+    if (params.videoId !== undefined) {
+      payload.video_id = params.videoId
+    }
+    if (params.videoName !== undefined) {
+      payload.video_name = params.videoName
+    }
+
+    this.log('thumbnail_load_failure', payload)
+  }
+
+  /**
    * Tracks when the player selects a meme thumbnail card.
-   * @param params - Selected and target video details and selection outcome.
+   * @param params - Selected and target video details, selection outcome, stage, and answer time.
    */
   trackThumbnailSelect(params: ThumbnailSelectParams): void {
     const payload: Record<string, string | number | boolean> = {
       result: params.result,
+      stage_number: params.stageNumber,
+      answer_seconds: params.answerSeconds,
     }
 
     if (params.selectedVideoId !== undefined) {
@@ -167,6 +275,47 @@ export class AnalyticsService {
     }
 
     this.log('thumbnail_select', payload)
+  }
+
+  /**
+   * Tracks when a match finishes and the results are shown.
+   * @param params - Match settings and final result.
+   */
+  trackMatchComplete(params: MatchCompleteParams): void {
+    this.log('match_complete', {
+      difficulty: params.difficulty,
+      match_length: params.matchLength,
+      iq_score: params.iqScore,
+      correct_count: params.correctCount,
+      stage_count: params.stageCount,
+    })
+  }
+
+  /**
+   * Tracks when the player returns to the main menu from the results.
+   * @param iqScore - Final IQ score of the match.
+   */
+  trackResultsMenuClick(iqScore: number): void {
+    this.log('results_menu_click', {
+      iq_score: iqScore,
+    })
+  }
+
+  /**
+   * Tracks when the meme catalogue fails to load.
+   * @param errorMessage - Reason the catalogue could not be loaded.
+   */
+  trackCatalogueLoadError(errorMessage: string): void {
+    this.log('catalogue_load_error', {
+      error_message: errorMessage,
+    })
+  }
+
+  /**
+   * Tracks when the player retries loading the meme catalogue.
+   */
+  trackCatalogueRetry(): void {
+    this.log('catalogue_retry')
   }
 }
 

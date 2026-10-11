@@ -27,9 +27,9 @@ interface ContentBounds {
  * Downloads a thumbnail and trims the black bands (letterbox or pillarbox) baked into it.
  * Falls back to the original URL when the image has no bands or its pixels cannot be read.
  * @param imageUrl - URL of the thumbnail image.
- * @returns Resolves with a data URL of the trimmed image, or the original URL.
+ * @returns Resolves with a data URL of the trimmed image, the original URL, or null when the image fails to download.
  */
-export function loadThumbnail(imageUrl: string): Promise<string> {
+export function loadThumbnail(imageUrl: string): Promise<string | null> {
   return new Promise((resolve) => {
     const image = new Image()
     image.crossOrigin = 'anonymous'
@@ -37,7 +37,7 @@ export function loadThumbnail(imageUrl: string): Promise<string> {
       resolve(trimDarkBands(image) ?? imageUrl)
     }
     image.onerror = (): void => {
-      resolve(imageUrl)
+      resolve(null)
     }
     image.src = imageUrl
   })

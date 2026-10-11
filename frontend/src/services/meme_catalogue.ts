@@ -1,5 +1,6 @@
 import {ref} from 'vue'
 import {MATCH_LENGTH_MEME_COUNTS, MEME_CATALOGUE_URL} from '@/constants'
+import {analytics} from '@/services/analytics'
 import type {MatchLength} from '@/types/match_length'
 import type {Meme} from '@/types/meme'
 
@@ -48,6 +49,7 @@ export async function fetchMemeCatalogue(): Promise<Meme[]> {
     const message = error instanceof Error ? error.message : 'Failed to load meme catalogue'
     catalogueError.value = message
     isCatalogueLoading.value = false
+    analytics.trackCatalogueLoadError(message)
     return []
   }
 }

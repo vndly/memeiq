@@ -10,6 +10,7 @@ import LoadingSpinner from '@/components/loading_spinner.vue'
 import PauseDialog from '@/components/pause_dialog.vue'
 import {DEFAULT_DIFFICULTY, DEFAULT_MATCH_LENGTH, DIFFICULTY_CARD_COUNTS, IQ_PENALTY_SECONDS_PER_POINT, MAX_IQ_SCORE, THUMBNAIL_RATIO} from '@/constants'
 import {analytics} from '@/services/analytics'
+import type {AudioUnavailableParams} from '@/services/analytics'
 import {getMatchMemeCount, memeCatalogue, pickStageMemes, shuffleMemes} from '@/services/meme_catalogue'
 import {playButtonSound} from '@/services/sound_effects'
 import {loadThumbnail} from '@/services/thumbnail_loader'
@@ -175,7 +176,17 @@ async function loadStage(): Promise<void> {
 
   const thumbnailLoads = selectedMemes.value.map(async (meme) => {
     const thumbnailUrl = getYouTubeThumbnailUrl(meme.url)
-    const loadedUrl = thumbnailUrl !== null ? await loadThumbnail(thumbnailUrl) : ''
+    let loadedUrl = ''
+    if (thumbnailUrl !== null) {
+      const trimmedUrl = await loadThumbnail(thumbnailUrl)
+      if (trimmedUrl === null) {
+        analytics.trackThumbnailLoadFailure({
+          videoId: extractYouTubeVideoId(meme.url) ?? undefined,
+          videoName: meme.name,
+        })
+      }
+      loadedUrl = trimmedUrl ?? thumbnailUrl
+    }
     return [
       meme.id,
       loadedUrl,
@@ -208,6 +219,13 @@ function advanceStage(): void {
     stopSoundEffects()
     audioPlayer?.destroy()
     isMatchComplete.value = true
+    analytics.trackMatchComplete({
+      difficulty: difficulty.value,
+      matchLength: matchLength.value,
+      iqScore: roundedIqScore.value,
+      correctCount: correctAnswerCount.value,
+      stageCount: stageCount.value,
+    })
     playSoundEffect(finishedAudio)
     startIqCountUp()
     return
@@ -414,6 +432,8 @@ function handleCardClick(meme: Meme): void {
     targetVideoId: targetVideoId,
     targetVideoName: activeMeme.value.name,
     result: isCorrect ? 'success' : 'failure',
+    stageNumber: stageNumber.value,
+    answerSeconds: Math.round(getStageElapsedSeconds() * 10) / 10,
   })
 
   scheduleStageAdvance()
@@ -444,7 +464,7 @@ function setupAudioPlayer(): void {
       },
       onError: (): void => {
         isPlayerReady.value = false
-        isAudioUnavailable.value = true
+        markAudioUnavailable('error')
         if (!isStageLoading.value) {
           startStageClock()
         }
@@ -468,9 +488,24 @@ function setupAudioPlayer(): void {
   if (meme !== null && videoId !== null && playerHostElement.value !== null) {
     void audioPlayer.mount(playerHostElement.value, videoId, meme.volume)
   } else {
-    isAudioUnavailable.value = true
+    markAudioUnavailable('missing_video')
     settleAudioLoad()
   }
+}
+
+/**
+ * Marks the active meme's audio as unavailable so the cards unlock without it, reporting it once per stage.
+ * @param reason - Why the audio cannot be played.
+ */
+function markAudioUnavailable(reason: AudioUnavailableParams['reason']): void {
+  if (!isAudioUnavailable.value) {
+    analytics.trackAudioUnavailable({
+      videoId: activeMeme.value !== null ? extractYouTubeVideoId(activeMeme.value.url) ?? undefined : undefined,
+      videoName: activeMeme.value?.name,
+      reason: reason,
+    })
+  }
+  isAudioUnavailable.value = true
 }
 
 /**
@@ -489,6 +524,13 @@ function autoplayAudio(): void {
   autoplayCheckTimeoutId = setTimeout(() => {
     autoplayCheckTimeoutId = null
     isAudioStarting.value = false
+    // A dialog opened meanwhile pauses the audio, and a player error already reports the audio as unavailable, so neither is a blocked autoplay
+    if (!hasAudioPlayed.value && !isDialogOpen.value && !isAudioUnavailable.value && activeMeme.value !== null) {
+      analytics.trackAutoplayBlocked({
+        videoId: extractYouTubeVideoId(activeMeme.value.url) ?? undefined,
+        videoName: activeMeme.value.name,
+      })
+    }
   }, AUTOPLAY_CHECK_DELAY_MS)
 }
 
@@ -506,6 +548,7 @@ function handlePlayClick(): void {
   analytics.trackAudioPlay({
     videoId: videoId,
     videoName: activeMeme.value.name,
+    isReplay: hasAudioPlayed.value,
   })
   audioPlayer.play()
 
@@ -514,7 +557,7 @@ function handlePlayClick(): void {
     autoplayCheckTimeoutId = null
     isAudioStarting.value = false
     if (!hasAudioPlayed.value) {
-      isAudioUnavailable.value = true
+      markAudioUnavailable('not_started')
       startStageClock()
     }
   }, AUTOPLAY_CHECK_DELAY_MS)
@@ -590,7 +633,10 @@ function handleQuit(): void {
  * Confirms navigation away from the match screen.
  */
 function handleConfirmLeave(): void {
-  analytics.trackMatchLeave()
+  analytics.trackMatchLeave({
+    stageNumber: stageNumber.value,
+    correctCount: correctAnswerCount.value,
+  })
   isNavigationConfirmed.value = true
   isConfirmOpen.value = false
   const destination = targetRoute.value ?? {
@@ -614,6 +660,7 @@ function handleCancelLeave(): void {
  */
 function handleMenuClick(): void {
   playButtonSound()
+  analytics.trackResultsMenuClick(roundedIqScore.value)
   leaveMatch({
     name: 'home',
   })
