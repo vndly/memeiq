@@ -23,6 +23,7 @@ Meme IQ (Vite + Vue 3, TypeScript, Composition API with `<script setup>`, ESLint
 - **Code style**: Enforced by ESLint with `@stylistic`. No semicolons, single quotes, 2-space indentation, 1tbs brace style, multiline trailing commas, `object-shorthand: 'never'`, `curly: 'all'`, and prefix unused variables with `_`.
 - **Getters & Comments**: Prefer getters over parameterless methods for computed instance state without side effects. Follow JSDoc conventions for classes and functions (see `docs/typescript.md`).
 - **Responsive & Mobile**: The web app must work seamlessly across mobile and desktop devices. Ensure touch-friendly interactive targets (minimum 44×44px), fluid layouts without unintended horizontal overflow, safe area inset accommodation, and responsiveness across varied screen sizes.
+- **Match audio**: The match screen preloads the next stage's audio in a standby player (sharing the hidden player host) once the current stage's audio starts or is marked unavailable, and swaps it in on advance. The audio player reloads itself after temporary load failures (growing delay, capped at 10s) and reports only permanent video errors or any error once the player is ready.
 
 ## Workflow
 

@@ -6,8 +6,22 @@ import type {YouTubeNamespace,
 
 let apiPromise: Promise<YouTubeNamespace> | null = null
 
-/** Milliseconds a mounted player may take to report ready before it is treated as failed. */
+/** Milliseconds a mounted player may take to report ready before it is reloaded. */
 const PLAYER_READY_TIMEOUT_MS = 15000
+
+/** Milliseconds before the first reload of a player whose load failed temporarily; each further reload waits twice as long. */
+const PLAYER_RETRY_BASE_DELAY_MS = 1000
+
+/** Longest wait, in milliseconds, before reloading a player whose load failed temporarily. */
+const PLAYER_RETRY_MAX_DELAY_MS = 10000
+
+/** YouTube error codes for a video that can never play here (invalid ID, removed or private, embedding disabled), so reloading cannot help. */
+const PERMANENT_PLAYER_ERROR_CODES: ReadonlySet<number> = new Set([
+  2,
+  100,
+  101,
+  150,
+])
 
 /**
  * Loads the YouTube IFrame API script and resolves when the global YT namespace is ready.
@@ -115,10 +129,13 @@ export class YouTubeAudioPlayer {
   private isPlayerReady: boolean = false
   private pendingPlay: boolean = false
   private isPlaybackActive: boolean = false
+  private isFailed: boolean = false
   private callbacks: YouTubeAudioPlayerCallbacks
-  private hostElement: HTMLElement | null = null
+  private wrapperElement: HTMLElement | null = null
   private mountGeneration: number = 0
   private readyTimeoutId: ReturnType<typeof setTimeout> | null = null
+  private retryTimeoutId: ReturnType<typeof setTimeout> | null = null
+  private retryAttempt: number = 0
   private volume: number = 100
 
   /**
@@ -131,9 +148,12 @@ export class YouTubeAudioPlayer {
     this.isPlayerReady = false // Whether player is ready for playback
     this.pendingPlay = false // Whether playback was queued before ready
     this.isPlaybackActive = false // Whether playback was requested and has not been paused, stopped, or ended
-    this.hostElement = null // Host container element
+    this.isFailed = false // Whether the player reported an error that reloading cannot fix
+    this.wrapperElement = null // Element this player owns inside the host container, so players can share a host
     this.mountGeneration = 0 // Generation counter to guard async mount
-    this.readyTimeoutId = null // Pending timeout that fails a player that never reports ready
+    this.readyTimeoutId = null // Pending timeout that reloads a player that never reports ready
+    this.retryTimeoutId = null // Pending timeout that reloads a player after a temporary load failure
+    this.retryAttempt = 0 // Reloads made since the last external mount, which sets the next reload's delay
     this.volume = 100 // Volume (0-100) applied when the player reports ready
   }
 
@@ -152,29 +172,56 @@ export class YouTubeAudioPlayer {
   }
 
   /**
+   * Indicates whether the player reported an error, either a video that can never play here or a failure during playback.
+   */
+  get failed(): boolean {
+    return this.isFailed
+  }
+
+  /**
+   * Indicates whether the player is waiting out the delay before reloading after a temporary load failure.
+   */
+  get retrying(): boolean {
+    return this.retryTimeoutId !== null
+  }
+
+  /**
    * Mounts the YouTube player to a container element for a specific video ID.
+   * Temporary load failures before the player is ready reload it after a growing delay instead of reporting an error.
+   * @param container - Host DOM element for the iframe.
+   * @param videoId - YouTube video ID to load.
+   * @param volume - Playback volume (1-100) for the video.
+   * @returns Resolves when the first attempt's player instance is initialized.
+   */
+  async mount(container: HTMLElement, videoId: string, volume: number): Promise<void> {
+    this.retryAttempt = 0
+    await this.mountAttempt(container, videoId, volume)
+  }
+
+  /**
+   * Makes one attempt at mounting the YouTube player, replacing any previous one.
    * @param container - Host DOM element for the iframe.
    * @param videoId - YouTube video ID to load.
    * @param volume - Playback volume (1-100) for the video.
    * @returns Resolves when the player instance is initialized.
    */
-  async mount(container: HTMLElement, videoId: string, volume: number): Promise<void> {
+  private async mountAttempt(container: HTMLElement, videoId: string, volume: number): Promise<void> {
     this.destroy()
-    this.hostElement = container
+    const wrapper = document.createElement('div')
+    container.appendChild(wrapper)
+    this.wrapperElement = wrapper
     this.volume = volume
-    this.isPlayerReady = false
     const currentGeneration = ++this.mountGeneration
 
     try {
       const namespace = await loadYouTubeIframeApi()
 
-      if (this.hostElement === null || this.mountGeneration !== currentGeneration) {
+      if (this.mountGeneration !== currentGeneration) {
         return
       }
 
-      container.replaceChildren()
       const placeholder = document.createElement('div')
-      container.appendChild(placeholder)
+      wrapper.appendChild(placeholder)
 
       this.player = new namespace.Player(placeholder, {
         videoId: videoId,
@@ -199,26 +246,50 @@ export class YouTubeAudioPlayer {
             }
           },
           onError: (event: YouTubePlayerErrorEvent): void => {
-            if (this.mountGeneration === currentGeneration) {
+            if (this.mountGeneration !== currentGeneration) {
+              return
+            }
+            // Before the player is ready, an error not tied to the video itself may clear up on a fresh load
+            if (!this.isPlayerReady && !PERMANENT_PLAYER_ERROR_CODES.has(event.data)) {
+              this.scheduleRetry(container, videoId, volume)
+            } else {
               this.handleError(event)
             }
           },
         },
       })
 
-      // A player whose iframe never loads reports neither ready nor error, so give up on it after a while
+      // A player whose iframe never loads reports neither ready nor error, so reload it after a while
       this.readyTimeoutId = setTimeout(() => {
         this.readyTimeoutId = null
         if (this.mountGeneration === currentGeneration) {
-          this.destroy()
-          this.callbacks.onError()
+          this.scheduleRetry(container, videoId, volume)
         }
       }, PLAYER_READY_TIMEOUT_MS)
     } catch {
       if (this.mountGeneration === currentGeneration) {
-        this.callbacks.onError()
+        this.scheduleRetry(container, videoId, volume)
       }
     }
+  }
+
+  /**
+   * Tears down the failed player and mounts it again after a delay that doubles with each attempt, up to a maximum.
+   * @param container - Host DOM element for the iframe.
+   * @param videoId - YouTube video ID to load.
+   * @param volume - Playback volume (1-100) for the video.
+   */
+  private scheduleRetry(container: HTMLElement, videoId: string, volume: number): void {
+    this.destroy()
+    const delay = Math.min(PLAYER_RETRY_BASE_DELAY_MS * 2 ** this.retryAttempt, PLAYER_RETRY_MAX_DELAY_MS)
+    this.retryAttempt++
+    const retryGeneration = this.mountGeneration
+    this.retryTimeoutId = setTimeout(() => {
+      this.retryTimeoutId = null
+      if (this.mountGeneration === retryGeneration) {
+        void this.mountAttempt(container, videoId, volume)
+      }
+    }, delay)
   }
 
   /**
@@ -282,9 +353,11 @@ export class YouTubeAudioPlayer {
   destroy(): void {
     this.mountGeneration++
     this.clearReadyTimeout()
+    this.clearRetryTimeout()
     this.pendingPlay = false
     this.isPlaybackActive = false
     this.isPlayerReady = false
+    this.isFailed = false
     if (this.player !== null) {
       try {
         this.player.destroy()
@@ -293,9 +366,9 @@ export class YouTubeAudioPlayer {
       }
       this.player = null
     }
-    if (this.hostElement !== null) {
-      this.hostElement.replaceChildren()
-      this.hostElement = null
+    if (this.wrapperElement !== null) {
+      this.wrapperElement.remove()
+      this.wrapperElement = null
     }
   }
 
@@ -340,6 +413,7 @@ export class YouTubeAudioPlayer {
     this.clearReadyTimeout()
     this.pendingPlay = false
     this.isPlaybackActive = false
+    this.isFailed = true
     this.callbacks.onError()
   }
 
@@ -350,6 +424,16 @@ export class YouTubeAudioPlayer {
     if (this.readyTimeoutId !== null) {
       clearTimeout(this.readyTimeoutId)
       this.readyTimeoutId = null
+    }
+  }
+
+  /**
+   * Cancels the pending reload after a temporary failure, if any.
+   */
+  private clearRetryTimeout(): void {
+    if (this.retryTimeoutId !== null) {
+      clearTimeout(this.retryTimeoutId)
+      this.retryTimeoutId = null
     }
   }
 }

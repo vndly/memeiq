@@ -90,6 +90,8 @@ const failAudio = typeof Audio !== 'undefined' ? new Audio(failAudioUrl) : null
 const finishedAudio = typeof Audio !== 'undefined' ? new Audio(finishedAudioUrl) : null
 
 let audioPlayer: YouTubeAudioPlayer | null = null
+let standbyPlayer: YouTubeAudioPlayer | null = null
+let standbyMemeId: number | null = null
 let resetTimeoutId: ReturnType<typeof setTimeout> | null = null
 let autoplayCheckTimeoutId: ReturnType<typeof setTimeout> | null = null
 let resolveAudioLoad: (() => void) | null = null
@@ -146,6 +148,7 @@ function startMatch(): void {
   iqScore.value = 0
   isMatchComplete.value = false
   cancelIqCountUp()
+  destroyStandbyPlayer()
   void loadStage()
 }
 
@@ -205,6 +208,7 @@ async function loadStage(): Promise<void> {
   isStageLoading.value = false
   if (isAudioUnavailable.value) {
     startStageClock()
+    prewarmNextStage()
   }
   autoplayAudio()
 }
@@ -218,6 +222,7 @@ function advanceStage(): void {
     clearAutoplayCheckTimeout()
     stopSoundEffects()
     audioPlayer?.destroy()
+    destroyStandbyPlayer()
     isMatchComplete.value = true
     analytics.trackMatchComplete({
       difficulty: difficulty.value,
@@ -451,46 +456,140 @@ function scheduleStageAdvance(): void {
 }
 
 /**
- * Initializes or remounts the YouTube audio player for the current active meme.
+ * Handles the active meme's audio reaching its end.
+ */
+function handleAudioEnded(): void {
+  // A clip that ends just as the pause dialog opens must not replay on resume
+  isAudioPausedByDialog = false
+  isAudioPlaying.value = false
+}
+
+/**
+ * Handles the active meme's audio failing to load or play, unlocking the cards without it.
+ */
+function handleAudioError(): void {
+  isPlayerReady.value = false
+  markAudioUnavailable('error')
+  if (!isStageLoading.value) {
+    startStageClock()
+    prewarmNextStage()
+  }
+  settleAudioLoad()
+}
+
+/**
+ * Handles the active meme's audio starting to play.
+ */
+function handleAudioPlaying(): void {
+  hasAudioPlayed.value = true
+  startStageClock()
+  prewarmNextStage()
+  isAudioStarting.value = false
+  isAudioPlaying.value = true
+}
+
+/**
+ * Handles the active meme's audio becoming ready to play.
+ */
+function handleAudioReady(): void {
+  isPlayerReady.value = true
+  settleAudioLoad()
+}
+
+/**
+ * Creates an audio player that reports its events only while it is the active player, so a standby player stays silent.
+ * @returns The new audio player.
+ */
+function createAudioPlayer(): YouTubeAudioPlayer {
+  const player: YouTubeAudioPlayer = new YouTubeAudioPlayer({
+    onEnded: (): void => {
+      if (player === audioPlayer) {
+        handleAudioEnded()
+      }
+    },
+    onError: (): void => {
+      if (player === audioPlayer) {
+        handleAudioError()
+      }
+    },
+    onPlaying: (): void => {
+      if (player === audioPlayer) {
+        handleAudioPlaying()
+      }
+    },
+    onReady: (): void => {
+      if (player === audioPlayer) {
+        handleAudioReady()
+      }
+    },
+  })
+  return player
+}
+
+/**
+ * Initializes or remounts the YouTube audio player for the current active meme, taking over the standby player when it already loads that meme.
  */
 function setupAudioPlayer(): void {
   isPlayerReady.value = false
-  if (audioPlayer === null) {
-    audioPlayer = new YouTubeAudioPlayer({
-      onEnded: (): void => {
-        // A clip that ends just as the pause dialog opens must not replay on resume
-        isAudioPausedByDialog = false
-        isAudioPlaying.value = false
-      },
-      onError: (): void => {
-        isPlayerReady.value = false
-        markAudioUnavailable('error')
-        if (!isStageLoading.value) {
-          startStageClock()
-        }
-        settleAudioLoad()
-      },
-      onPlaying: (): void => {
-        hasAudioPlayed.value = true
-        startStageClock()
-        isAudioStarting.value = false
-        isAudioPlaying.value = true
-      },
-      onReady: (): void => {
-        isPlayerReady.value = true
-        settleAudioLoad()
-      },
-    })
-  }
-
   const meme = activeMeme.value
   const videoId = meme !== null ? extractYouTubeVideoId(meme.url) : null
-  if (meme !== null && videoId !== null && playerHostElement.value !== null) {
-    void audioPlayer.mount(playerHostElement.value, videoId, meme.volume)
-  } else {
+  if (meme === null || videoId === null || playerHostElement.value === null) {
     markAudioUnavailable('missing_video')
     settleAudioLoad()
+    return
   }
+
+  if (standbyPlayer !== null && standbyMemeId === meme.id) {
+    // The previous active player is torn down and kept as the standby for the stage after this one
+    const previousPlayer = audioPlayer
+    audioPlayer = standbyPlayer
+    standbyPlayer = previousPlayer
+    standbyPlayer?.destroy()
+    standbyMemeId = null
+    // A standby still loading settles the audio load from its own ready or error event
+    if (audioPlayer.failed) {
+      handleAudioError()
+    } else if (audioPlayer.ready) {
+      handleAudioReady()
+    } else if (audioPlayer.retrying) {
+      // Reload at once rather than wait out a delay that grew while the connection may since have recovered
+      void audioPlayer.mount(playerHostElement.value, videoId, meme.volume)
+    }
+    return
+  }
+
+  if (audioPlayer === null) {
+    audioPlayer = createAudioPlayer()
+  }
+  void audioPlayer.mount(playerHostElement.value, videoId, meme.volume)
+}
+
+/**
+ * Starts loading the next stage's audio in the standby player, so that stage does not wait for its audio once revealed.
+ */
+function prewarmNextStage(): void {
+  const nextMeme = stageTargetMemes.value[stageIndex.value + 1]
+  if (nextMeme === undefined || isMatchComplete.value || isStageLoading.value || standbyMemeId === nextMeme.id) {
+    return
+  }
+  const videoId = extractYouTubeVideoId(nextMeme.url)
+  const hostElement = playerHostElement.value
+  if (videoId === null || hostElement === null) {
+    return
+  }
+  if (standbyPlayer === null) {
+    standbyPlayer = createAudioPlayer()
+  }
+  standbyMemeId = nextMeme.id
+  void standbyPlayer.mount(hostElement, videoId, nextMeme.volume)
+}
+
+/**
+ * Tears down the standby player's preloaded audio, if any.
+ */
+function destroyStandbyPlayer(): void {
+  standbyPlayer?.destroy()
+  standbyMemeId = null
 }
 
 /**
@@ -559,6 +658,7 @@ function handlePlayClick(): void {
     if (!hasAudioPlayed.value) {
       markAudioUnavailable('not_started')
       startStageClock()
+      prewarmNextStage()
     }
   }, AUTOPLAY_CHECK_DELAY_MS)
 }
@@ -723,6 +823,8 @@ onUnmounted(() => {
     audioPlayer.destroy()
     audioPlayer = null
   }
+  destroyStandbyPlayer()
+  standbyPlayer = null
   stopSoundEffects()
 })
 

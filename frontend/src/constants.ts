@@ -28,7 +28,7 @@ export const DEFAULT_MATCH_LENGTH: MatchLength = 'full'
 /** Number of memes played for each match length; the full length plays the whole catalogue. */
 export const MATCH_LENGTH_MEME_COUNTS: Record<MatchLength, number> = {
   small: 10,
-  medium: 20,
+  medium: 30,
   full: Infinity,
 }
 
