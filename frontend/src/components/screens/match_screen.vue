@@ -84,6 +84,7 @@ const hasAudioPlayed = ref(false)
 const isAudioStarting = ref(false)
 const isAudioPlaying = ref(false)
 const displayedIqScore = ref(0)
+const secondsPerMeme = ref(0)
 
 const winAudio = typeof Audio !== 'undefined' ? new Audio(winAudioUrl) : null
 const failAudio = typeof Audio !== 'undefined' ? new Audio(failAudioUrl) : null
@@ -100,6 +101,8 @@ let stageLoadGeneration = 0
 let isStageClockStarted = false
 let stageClockRunningSince: number | null = null
 let stageClockElapsedMs = 0
+let matchClockRunningSince: number | null = null
+let matchClockElapsedMs = 0
 let iqCountUpFrameId: number | null = null
 
 const RESET_ROUND_DELAY_MS = 1000
@@ -134,6 +137,10 @@ const iqScoreMinWidth = computed(() => {
   return `${String(roundedIqScore.value).length}ch`
 })
 
+const formattedSecondsPerMeme = computed(() => {
+  return secondsPerMeme.value.toFixed(1)
+})
+
 /**
  * Starts a new match with one stage per randomly picked catalogue meme, as many as the match length allows.
  */
@@ -146,7 +153,9 @@ function startMatch(): void {
   stageIndex.value = 0
   correctAnswerCount.value = 0
   iqScore.value = 0
+  secondsPerMeme.value = 0
   isMatchComplete.value = false
+  startMatchClock()
   cancelIqCountUp()
   destroyStandbyPlayer()
   void loadStage()
@@ -223,6 +232,8 @@ function advanceStage(): void {
     stopSoundEffects()
     audioPlayer?.destroy()
     destroyStandbyPlayer()
+    pauseMatchClock()
+    secondsPerMeme.value = matchClockElapsedMs / 1000 / stageCount.value
     isMatchComplete.value = true
     analytics.trackMatchComplete({
       difficulty: difficulty.value,
@@ -398,6 +409,33 @@ function resumeStageClock(): void {
 function getStageElapsedSeconds(): number {
   const runningMs = stageClockRunningSince !== null ? performance.now() - stageClockRunningSince : 0
   return (stageClockElapsedMs + runningMs) / 1000
+}
+
+/**
+ * Restarts the match clock from zero; it stays frozen while a dialog is open.
+ */
+function startMatchClock(): void {
+  matchClockElapsedMs = 0
+  matchClockRunningSince = isDialogOpen.value ? null : performance.now()
+}
+
+/**
+ * Freezes the match clock, keeping the time elapsed so far.
+ */
+function pauseMatchClock(): void {
+  if (matchClockRunningSince !== null) {
+    matchClockElapsedMs += performance.now() - matchClockRunningSince
+    matchClockRunningSince = null
+  }
+}
+
+/**
+ * Restarts the match clock if it is frozen and the match is still in progress.
+ */
+function resumeMatchClock(): void {
+  if (!isMatchComplete.value && matchClockRunningSince === null) {
+    matchClockRunningSince = performance.now()
+  }
 }
 
 /**
@@ -679,6 +717,7 @@ function pauseMatch(): void {
   isAudioPausedByDialog = audioPlayer?.playing ?? false
   audioPlayer?.pause()
   pauseStageClock()
+  pauseMatchClock()
   stopSoundEffects()
   clearResetTimeout()
   isPauseOpen.value = true
@@ -704,6 +743,7 @@ function handleResume(): void {
   isPauseOpen.value = false
   targetRoute.value = null
   resumeStageClock()
+  resumeMatchClock()
   const wasAudioPaused = isAudioPausedByDialog
   isAudioPausedByDialog = false
   if (isStageLoading.value || isMatchComplete.value) {
@@ -898,6 +938,17 @@ watch(
           </dt>
           <dd class="results-setting-frame">
             <span class="results-setting-value">{{ difficulty }}</span>
+          </dd>
+        </div>
+        <div class="results-setting">
+          <dt class="results-setting-caption">
+            Pace
+          </dt>
+          <dd class="results-setting-frame">
+            <span class="results-setting-value results-setting-value--count">
+              <span aria-hidden="true">{{ formattedSecondsPerMeme }}s</span>
+              <span class="visually-hidden">{{ formattedSecondsPerMeme }} seconds per meme</span>
+            </span>
           </dd>
         </div>
       </dl>
@@ -1240,6 +1291,8 @@ watch(
 .results-setting-value--count {
   font-size: 1.375rem;
   font-variant-numeric: tabular-nums;
+  /* Keeps unit suffixes such as "s" lowercase */
+  text-transform: none;
 }
 
 .results .action-button {
