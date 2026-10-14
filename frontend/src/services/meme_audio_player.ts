@@ -1,5 +1,5 @@
-/** Milliseconds a clip may take to download before the download is restarted. */
-const AUDIO_LOAD_TIMEOUT_MS = 15000
+/** Milliseconds a download may go without receiving any data before it is restarted. */
+const AUDIO_STALL_TIMEOUT_MS = 15000
 
 /** Milliseconds before the first restart of a download that failed temporarily; each further restart waits twice as long. */
 const AUDIO_RETRY_BASE_DELAY_MS = 1000
@@ -46,7 +46,7 @@ export class MemeAudioPlayer {
     this.isPlaybackActive = false // Whether playback was requested and has not been paused, stopped, or ended
     this.isFailed = false // Whether the clip can never play, or failed during playback
     this.loadGeneration = 0 // Generation counter to guard async loads
-    this.loadTimeoutId = null // Pending timeout that restarts a download that never finishes
+    this.loadTimeoutId = null // Pending timeout that restarts a download that stops receiving data
     this.retryTimeoutId = null // Pending timeout that restarts a download after a temporary failure
     this.retryAttempt = 0 // Restarts made since the last external load, which sets the next restart's delay
   }
@@ -101,13 +101,8 @@ export class MemeAudioPlayer {
     const abortController = new AbortController()
     this.abortController = abortController
 
-    // A stalled download reports neither success nor failure, so restart it after a while
-    this.loadTimeoutId = setTimeout(() => {
-      this.loadTimeoutId = null
-      if (this.loadGeneration === currentGeneration) {
-        this.scheduleRetry(audioUrl)
-      }
-    }, AUDIO_LOAD_TIMEOUT_MS)
+    // A stalled download reports neither success nor failure, so restart it once no data has arrived for a while
+    this.restartStallTimeout(audioUrl, currentGeneration)
 
     let audioBlob: Blob
     try {
@@ -125,7 +120,7 @@ export class MemeAudioPlayer {
         }
         return
       }
-      audioBlob = await response.blob()
+      audioBlob = await this.readBody(response, audioUrl, currentGeneration)
     } catch {
       // Network failures may clear up on a fresh download; an abort comes from a teardown that already superseded this attempt
       if (this.loadGeneration === currentGeneration) {
@@ -160,6 +155,48 @@ export class MemeAudioPlayer {
     this.objectUrl = objectUrl
     this.audioElement = audioElement
     this.handleReady()
+  }
+
+  /**
+   * Reads a response body chunk by chunk, so a slow download that keeps receiving data is never mistaken for a stalled one.
+   * @param response - Response of the clip download.
+   * @param audioUrl - URL of the clip to load.
+   * @param generation - Load generation the download belongs to.
+   * @returns The whole clip.
+   */
+  private async readBody(response: Response, audioUrl: string, generation: number): Promise<Blob> {
+    if (response.body === null) {
+      return await response.blob()
+    }
+    const reader = response.body.getReader()
+    const chunks: Uint8Array<ArrayBuffer>[] = []
+    let result = await reader.read()
+    while (!result.done) {
+      chunks.push(result.value)
+      this.restartStallTimeout(audioUrl, generation)
+      result = await reader.read()
+    }
+    return new Blob(chunks, {
+      type: response.headers.get('Content-Type') ?? '',
+    })
+  }
+
+  /**
+   * Starts, or starts over, the timeout that restarts the download when no data arrives in time.
+   * @param audioUrl - URL of the clip to load.
+   * @param generation - Load generation the download belongs to; a superseded download leaves the newer one's timeout alone.
+   */
+  private restartStallTimeout(audioUrl: string, generation: number): void {
+    if (this.loadGeneration !== generation) {
+      return
+    }
+    this.clearLoadTimeout()
+    this.loadTimeoutId = setTimeout(() => {
+      this.loadTimeoutId = null
+      if (this.loadGeneration === generation) {
+        this.scheduleRetry(audioUrl)
+      }
+    }, AUDIO_STALL_TIMEOUT_MS)
   }
 
   /**
