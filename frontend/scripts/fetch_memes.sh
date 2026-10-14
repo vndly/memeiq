@@ -4,7 +4,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUTPUT_FILE="${SCRIPT_DIR}/../src/assets/memes.json"
-MEME_CATALOGUE_URL="https://script.google.com/macros/s/AKfycbz8FLWuiaDvIkKVAnjFWU2xDv4wbQt9MxuGvh4yLEdgtLygnpdyTckihAAFp6K4vX_OQA/exec"
+MEME_CATALOGUE_URL="https://script.google.com/macros/s/AKfycbwo0-EesudXLef03CbyhU5sNG7gsCDJPhXKvVvRqxljpDBrnbTx0f9gpVXKna-CspCXrA/exec"
 MAX_ATTEMPTS=5
 RETRY_DELAY_SECONDS=3
 
@@ -23,7 +23,7 @@ for ((attempt = 1; attempt <= MAX_ATTEMPTS; attempt++)); do
         process.exit(1);
       }
       for (const item of data) {
-        if (typeof item.id !== "number" || typeof item.name !== "string" || typeof item.url !== "string" || typeof item.volume !== "number" || item.volume < 1 || item.volume > 100) {
+        if (typeof item.id !== "string" || typeof item.name !== "string" || typeof item.url !== "string" || typeof item.volume !== "number" || item.volume < 1 || item.volume > 100) {
           process.exit(1);
         }
       }

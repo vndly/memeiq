@@ -74,12 +74,12 @@ const iqScore = ref(0)
 const isStageLoading = ref(true)
 const isMatchComplete = ref(false)
 const selectedMemes = ref<Meme[]>([])
-const thumbnailUrls = ref<Record<number, string>>({})
+const thumbnailUrls = ref<Record<string, string>>({})
 const activeMeme = ref<Meme | null>(null)
 const isPlayerReady = ref(false)
 const isAudioUnavailable = ref(false)
 const playerHostElement = ref<HTMLElement | null>(null)
-const clickedMemeId = ref<number | null>(null)
+const clickedMemeId = ref<string | null>(null)
 const hasAudioPlayed = ref(false)
 const isAudioStarting = ref(false)
 const isAudioPlaying = ref(false)
@@ -92,7 +92,7 @@ const finishedAudio = typeof Audio !== 'undefined' ? new Audio(finishedAudioUrl)
 
 let audioPlayer: YouTubeAudioPlayer | null = null
 let standbyPlayer: YouTubeAudioPlayer | null = null
-let standbyMemeId: number | null = null
+let standbyMemeId: string | null = null
 let resetTimeoutId: ReturnType<typeof setTimeout> | null = null
 let autoplayCheckTimeoutId: ReturnType<typeof setTimeout> | null = null
 let resolveAudioLoad: (() => void) | null = null
