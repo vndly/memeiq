@@ -156,6 +156,20 @@ function startMatch(): void {
   cancelIqCountUp()
   destroyStandbyPlayer()
   void loadStage()
+  // Queued after the first stage's own thumbnails, so later stages find every card already cached
+  preloadCatalogueThumbnails()
+}
+
+/**
+ * Starts downloading the thumbnail of every catalogue meme, since any of them can appear as a card.
+ */
+function preloadCatalogueThumbnails(): void {
+  for (const meme of memeCatalogue.value) {
+    const thumbnailUrl = getMemeThumbnailUrl(meme.id)
+    if (thumbnailUrl !== null) {
+      void loadThumbnail(thumbnailUrl)
+    }
+  }
 }
 
 /**
