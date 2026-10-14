@@ -101,8 +101,7 @@ let stageLoadGeneration = 0
 let isStageClockStarted = false
 let stageClockRunningSince: number | null = null
 let stageClockElapsedMs = 0
-let matchClockRunningSince: number | null = null
-let matchClockElapsedMs = 0
+let matchAnswerSeconds = 0
 let iqCountUpFrameId: number | null = null
 
 const RESET_ROUND_DELAY_MS = 1000
@@ -154,8 +153,8 @@ function startMatch(): void {
   correctAnswerCount.value = 0
   iqScore.value = 0
   secondsPerMeme.value = 0
+  matchAnswerSeconds = 0
   isMatchComplete.value = false
-  startMatchClock()
   cancelIqCountUp()
   destroyStandbyPlayer()
   void loadStage()
@@ -232,8 +231,7 @@ function advanceStage(): void {
     stopSoundEffects()
     audioPlayer?.destroy()
     destroyStandbyPlayer()
-    pauseMatchClock()
-    secondsPerMeme.value = matchClockElapsedMs / 1000 / stageCount.value
+    secondsPerMeme.value = matchAnswerSeconds / stageCount.value
     isMatchComplete.value = true
     analytics.trackMatchComplete({
       difficulty: difficulty.value,
@@ -412,33 +410,6 @@ function getStageElapsedSeconds(): number {
 }
 
 /**
- * Restarts the match clock from zero; it stays frozen while a dialog is open.
- */
-function startMatchClock(): void {
-  matchClockElapsedMs = 0
-  matchClockRunningSince = isDialogOpen.value ? null : performance.now()
-}
-
-/**
- * Freezes the match clock, keeping the time elapsed so far.
- */
-function pauseMatchClock(): void {
-  if (matchClockRunningSince !== null) {
-    matchClockElapsedMs += performance.now() - matchClockRunningSince
-    matchClockRunningSince = null
-  }
-}
-
-/**
- * Restarts the match clock if it is frozen and the match is still in progress.
- */
-function resumeMatchClock(): void {
-  if (!isMatchComplete.value && matchClockRunningSince === null) {
-    matchClockRunningSince = performance.now()
-  }
-}
-
-/**
  * Computes the IQ points earned by a correct pick: an even share of the maximum IQ, minus one point per penalty interval elapsed.
  * @returns IQ points, never below zero.
  */
@@ -459,6 +430,8 @@ function handleCardClick(meme: Meme): void {
 
   clickedMemeId.value = meme.id
   audioPlayer?.stop()
+  const answerSeconds = getStageElapsedSeconds()
+  matchAnswerSeconds += answerSeconds
 
   const isCorrect = meme.id === activeMeme.value.id
   if (isCorrect) {
@@ -476,7 +449,7 @@ function handleCardClick(meme: Meme): void {
     targetVideoName: activeMeme.value.name,
     result: isCorrect ? 'success' : 'failure',
     stageNumber: stageNumber.value,
-    answerSeconds: Math.round(getStageElapsedSeconds() * 10) / 10,
+    answerSeconds: Math.round(answerSeconds * 10) / 10,
   })
 
   scheduleStageAdvance()
@@ -717,7 +690,6 @@ function pauseMatch(): void {
   isAudioPausedByDialog = audioPlayer?.playing ?? false
   audioPlayer?.pause()
   pauseStageClock()
-  pauseMatchClock()
   stopSoundEffects()
   clearResetTimeout()
   isPauseOpen.value = true
@@ -743,7 +715,6 @@ function handleResume(): void {
   isPauseOpen.value = false
   targetRoute.value = null
   resumeStageClock()
-  resumeMatchClock()
   const wasAudioPaused = isAudioPausedByDialog
   isAudioPausedByDialog = false
   if (isStageLoading.value || isMatchComplete.value) {
