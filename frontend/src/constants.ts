@@ -9,7 +9,7 @@ import type {MatchLength} from '@/types/match_length'
 /** Endpoint for fetching the meme catalogue. */
 export const MEME_CATALOGUE_URL = memesCatalogueUrl
 
-/** Default YouTube thumbnail aspect ratio (width to height). */
+/** Aspect ratio (width to height) of the meme card thumbnails. */
 export const THUMBNAIL_RATIO = 16 / 9
 
 /** Default difficulty level when none is specified. */

@@ -13,9 +13,9 @@ import {analytics} from '@/services/analytics'
 import type {AudioUnavailableParams} from '@/services/analytics'
 import {getMatchMemeCount, memeCatalogue, pickStageMemes, shuffleMemes} from '@/services/meme_catalogue'
 import {playButtonSound} from '@/services/sound_effects'
+import {MemeAudioPlayer} from '@/services/meme_audio_player'
+import {getMemeAudioUrl, getMemeThumbnailUrl} from '@/services/meme_media'
 import {loadThumbnail} from '@/services/thumbnail_loader'
-import {extractYouTubeVideoId, getYouTubeThumbnailUrl} from '@/services/youtube'
-import {YouTubeAudioPlayer} from '@/services/youtube_player'
 import {isDifficulty} from '@/types/difficulty'
 import type {Difficulty} from '@/types/difficulty'
 import {isMatchLength} from '@/types/match_length'
@@ -74,11 +74,9 @@ const iqScore = ref(0)
 const isStageLoading = ref(true)
 const isMatchComplete = ref(false)
 const selectedMemes = ref<Meme[]>([])
-const thumbnailUrls = ref<Record<string, string>>({})
 const activeMeme = ref<Meme | null>(null)
 const isPlayerReady = ref(false)
 const isAudioUnavailable = ref(false)
-const playerHostElement = ref<HTMLElement | null>(null)
 const clickedMemeId = ref<string | null>(null)
 const hasAudioPlayed = ref(false)
 const isAudioStarting = ref(false)
@@ -90,8 +88,8 @@ const winAudio = typeof Audio !== 'undefined' ? new Audio(winAudioUrl) : null
 const failAudio = typeof Audio !== 'undefined' ? new Audio(failAudioUrl) : null
 const finishedAudio = typeof Audio !== 'undefined' ? new Audio(finishedAudioUrl) : null
 
-let audioPlayer: YouTubeAudioPlayer | null = null
-let standbyPlayer: YouTubeAudioPlayer | null = null
+let audioPlayer: MemeAudioPlayer | null = null
+let standbyPlayer: MemeAudioPlayer | null = null
 let standbyMemeId: string | null = null
 let resetTimeoutId: ReturnType<typeof setTimeout> | null = null
 let autoplayCheckTimeoutId: ReturnType<typeof setTimeout> | null = null
@@ -186,24 +184,16 @@ async function loadStage(): Promise<void> {
   activeMeme.value = targetMeme
 
   const thumbnailLoads = selectedMemes.value.map(async (meme) => {
-    const thumbnailUrl = getYouTubeThumbnailUrl(meme.url)
-    let loadedUrl = ''
-    if (thumbnailUrl !== null) {
-      const trimmedUrl = await loadThumbnail(thumbnailUrl)
-      if (trimmedUrl === null) {
-        analytics.trackThumbnailLoadFailure({
-          videoId: extractYouTubeVideoId(meme.url) ?? undefined,
-          videoName: meme.name,
-        })
-      }
-      loadedUrl = trimmedUrl ?? thumbnailUrl
+    const thumbnailUrl = getMemeThumbnailUrl(meme.id)
+    const isLoaded = thumbnailUrl !== null && await loadThumbnail(thumbnailUrl)
+    if (!isLoaded) {
+      analytics.trackThumbnailLoadFailure({
+        videoId: meme.id,
+        videoName: meme.name,
+      })
     }
-    return [
-      meme.id,
-      loadedUrl,
-    ] as const
   })
-  const [loadedThumbnails] = await Promise.all([
+  await Promise.all([
     Promise.all(thumbnailLoads),
     loadAudio(),
   ])
@@ -212,7 +202,6 @@ async function loadStage(): Promise<void> {
     return
   }
 
-  thumbnailUrls.value = Object.fromEntries(loadedThumbnails)
   isStageLoading.value = false
   if (isAudioUnavailable.value) {
     startStageClock()
@@ -302,12 +291,12 @@ function settleAudioLoad(): void {
 }
 
 /**
- * Resolves the image shown on a meme card, trimmed of black bands when possible.
+ * Resolves the image shown on a meme card.
  * @param meme - Meme shown on the card.
  * @returns URL string for the card image.
  */
 function getCardImageUrl(meme: Meme): string {
-  return thumbnailUrls.value[meme.id] ?? getYouTubeThumbnailUrl(meme.url) ?? ''
+  return getMemeThumbnailUrl(meme.id) ?? ''
 }
 
 /**
@@ -440,12 +429,10 @@ function handleCardClick(meme: Meme): void {
   }
   playSoundEffect(isCorrect ? winAudio : failAudio)
 
-  const selectedVideoId = extractYouTubeVideoId(meme.url) ?? undefined
-  const targetVideoId = extractYouTubeVideoId(activeMeme.value.url) ?? undefined
   analytics.trackThumbnailSelect({
-    selectedVideoId: selectedVideoId,
+    selectedVideoId: meme.id,
     selectedVideoName: meme.name,
-    targetVideoId: targetVideoId,
+    targetVideoId: activeMeme.value.id,
     targetVideoName: activeMeme.value.name,
     result: isCorrect ? 'success' : 'failure',
     stageNumber: stageNumber.value,
@@ -511,8 +498,8 @@ function handleAudioReady(): void {
  * Creates an audio player that reports its events only while it is the active player, so a standby player stays silent.
  * @returns The new audio player.
  */
-function createAudioPlayer(): YouTubeAudioPlayer {
-  const player: YouTubeAudioPlayer = new YouTubeAudioPlayer({
+function createAudioPlayer(): MemeAudioPlayer {
+  const player: MemeAudioPlayer = new MemeAudioPlayer({
     onEnded: (): void => {
       if (player === audioPlayer) {
         handleAudioEnded()
@@ -538,13 +525,13 @@ function createAudioPlayer(): YouTubeAudioPlayer {
 }
 
 /**
- * Initializes or remounts the YouTube audio player for the current active meme, taking over the standby player when it already loads that meme.
+ * Loads the current active meme's audio, taking over the standby player when it already loads that meme.
  */
 function setupAudioPlayer(): void {
   isPlayerReady.value = false
   const meme = activeMeme.value
-  const videoId = meme !== null ? extractYouTubeVideoId(meme.url) : null
-  if (meme === null || videoId === null || playerHostElement.value === null) {
+  const audioUrl = meme !== null ? getMemeAudioUrl(meme.id) : null
+  if (meme === null || audioUrl === null) {
     markAudioUnavailable('missing_video')
     settleAudioLoad()
     return
@@ -564,7 +551,7 @@ function setupAudioPlayer(): void {
       handleAudioReady()
     } else if (audioPlayer.retrying) {
       // Reload at once rather than wait out a delay that grew while the connection may since have recovered
-      void audioPlayer.mount(playerHostElement.value, videoId, meme.volume)
+      void audioPlayer.load(audioUrl)
     }
     return
   }
@@ -572,7 +559,7 @@ function setupAudioPlayer(): void {
   if (audioPlayer === null) {
     audioPlayer = createAudioPlayer()
   }
-  void audioPlayer.mount(playerHostElement.value, videoId, meme.volume)
+  void audioPlayer.load(audioUrl)
 }
 
 /**
@@ -583,16 +570,15 @@ function prewarmNextStage(): void {
   if (nextMeme === undefined || isMatchComplete.value || isStageLoading.value || standbyMemeId === nextMeme.id) {
     return
   }
-  const videoId = extractYouTubeVideoId(nextMeme.url)
-  const hostElement = playerHostElement.value
-  if (videoId === null || hostElement === null) {
+  const audioUrl = getMemeAudioUrl(nextMeme.id)
+  if (audioUrl === null) {
     return
   }
   if (standbyPlayer === null) {
     standbyPlayer = createAudioPlayer()
   }
   standbyMemeId = nextMeme.id
-  void standbyPlayer.mount(hostElement, videoId, nextMeme.volume)
+  void standbyPlayer.load(audioUrl)
 }
 
 /**
@@ -610,7 +596,7 @@ function destroyStandbyPlayer(): void {
 function markAudioUnavailable(reason: AudioUnavailableParams['reason']): void {
   if (!isAudioUnavailable.value) {
     analytics.trackAudioUnavailable({
-      videoId: activeMeme.value !== null ? extractYouTubeVideoId(activeMeme.value.url) ?? undefined : undefined,
+      videoId: activeMeme.value?.id,
       videoName: activeMeme.value?.name,
       reason: reason,
     })
@@ -637,7 +623,7 @@ function autoplayAudio(): void {
     // A dialog opened meanwhile pauses the audio, and a player error already reports the audio as unavailable, so neither is a blocked autoplay
     if (!hasAudioPlayed.value && !isDialogOpen.value && !isAudioUnavailable.value && activeMeme.value !== null) {
       analytics.trackAutoplayBlocked({
-        videoId: extractYouTubeVideoId(activeMeme.value.url) ?? undefined,
+        videoId: activeMeme.value.id,
         videoName: activeMeme.value.name,
       })
     }
@@ -654,9 +640,8 @@ function handlePlayClick(): void {
   }
 
   isAudioStarting.value = true
-  const videoId = extractYouTubeVideoId(activeMeme.value.url) ?? undefined
   analytics.trackAudioPlay({
-    videoId: videoId,
+    videoId: activeMeme.value.id,
     videoName: activeMeme.value.name,
     isReplay: hasAudioPlayed.value,
   })
@@ -868,13 +853,6 @@ watch(
     <h1 class="visually-hidden">
       Match
     </h1>
-
-    <div
-      ref="playerHostElement"
-      class="audio-player-host"
-      aria-hidden="true"
-      tabindex="-1"
-    />
 
     <div
       v-if="isMatchComplete"
@@ -1488,16 +1466,6 @@ watch(
 .pause-icon {
   width: 22px;
   height: 22px;
-}
-
-.audio-player-host {
-  position: fixed;
-  top: -9999px;
-  left: -9999px;
-  width: 200px;
-  height: 200px;
-  opacity: 0;
-  pointer-events: none;
 }
 
 @media (min-width: 768px) {

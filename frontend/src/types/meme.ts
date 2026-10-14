@@ -4,7 +4,6 @@
 export interface Meme {
   id: string
   name: string
+  /** YouTube video the meme's audio and thumbnail are downloaded from by `scripts/download_media.sh`. */
   url: string
-  /** Player volume (1-100) that evens out loudness across memes, measured by `scripts/measure_volumes.sh`. */
-  volume: number
 }
