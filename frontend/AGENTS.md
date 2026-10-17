@@ -24,6 +24,7 @@ Meme IQ (Vite + Vue 3, TypeScript, Composition API with `<script setup>`, ESLint
 - **Getters & Comments**: Prefer getters over parameterless methods for computed instance state without side effects. Follow JSDoc conventions for classes and functions (see `docs/typescript.md`).
 - **Responsive & Mobile**: The web app must work seamlessly across mobile and desktop devices. Ensure touch-friendly interactive targets (minimum 44×44px), fluid layouts without unintended horizontal overflow, safe area inset accommodation, and responsiveness across varied screen sizes.
 - **Match audio**: The match screen preloads the next stage's audio in a standby player once the current stage's audio starts or is marked unavailable, and swaps it in on advance. The audio player downloads the whole clip before reporting ready (mobile browsers ignore preload hints), restarts the download after temporary failures (network errors, server errors or a stall; growing delay, capped at 10s), and reports any other failed response or any error once the player is ready.
+- **Match review**: The results screen's REVIEW button opens `src/components/match_review.vue` over it, listing each stage's played meme in play order, marked correct or missed. Opening it adds a `review` query key so Back closes it; the match screen drops the key whenever no finished match is shown (e.g. after a refresh). Review clips play from one plain audio element started inside the tap, not the match audio player, since iOS refuses playback that starts after an asynchronous download.
 
 ## Workflow
 

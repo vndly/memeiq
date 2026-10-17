@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {computed, onMounted, onUnmounted, ref, watch} from 'vue'
+import {computed, onMounted, onUnmounted, ref, useTemplateRef, watch} from 'vue'
 import {onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter} from 'vue-router'
 import type {LocationQuery, RouteLocationNormalized, RouteLocationRaw} from 'vue-router'
 import failAudioUrl from '@/assets/fail.mp3'
@@ -7,6 +7,7 @@ import finishedAudioUrl from '@/assets/finished.mp3'
 import winAudioUrl from '@/assets/win.mp3'
 import ConfirmDialog from '@/components/confirm_dialog.vue'
 import LoadingSpinner from '@/components/loading_spinner.vue'
+import MatchReview from '@/components/match_review.vue'
 import PauseDialog from '@/components/pause_dialog.vue'
 import {DEFAULT_DIFFICULTY, DEFAULT_MATCH_LENGTH, DIFFICULTY_CARD_COUNTS, IQ_PENALTY_SECONDS_PER_POINT, MAX_IQ_SCORE, THUMBNAIL_RATIO} from '@/constants'
 import {analytics} from '@/services/analytics'
@@ -21,6 +22,7 @@ import type {Difficulty} from '@/types/difficulty'
 import {isMatchLength} from '@/types/match_length'
 import type {MatchLength} from '@/types/match_length'
 import type {Meme} from '@/types/meme'
+import type {StageResult} from '@/types/stage_result'
 
 const router = useRouter()
 const route = useRoute()
@@ -83,6 +85,8 @@ const isAudioStarting = ref(false)
 const isAudioPlaying = ref(false)
 const displayedIqScore = ref(0)
 const secondsPerMeme = ref(0)
+const stageResults = ref<StageResult[]>([])
+const reviewButton = useTemplateRef<HTMLButtonElement>('reviewButton')
 
 const winAudio = typeof Audio !== 'undefined' ? new Audio(winAudioUrl) : null
 const failAudio = typeof Audio !== 'undefined' ? new Audio(failAudioUrl) : null
@@ -138,6 +142,10 @@ const formattedSecondsPerMeme = computed(() => {
   return secondsPerMeme.value.toFixed(1)
 })
 
+const isReviewOpen = computed(() => {
+  return isMatchComplete.value && route.query.review !== undefined
+})
+
 /**
  * Starts a new match with one stage per randomly picked catalogue meme, as many as the match length allows.
  */
@@ -151,6 +159,7 @@ function startMatch(): void {
   correctAnswerCount.value = 0
   iqScore.value = 0
   secondsPerMeme.value = 0
+  stageResults.value = []
   matchAnswerSeconds = 0
   isMatchComplete.value = false
   cancelIqCountUp()
@@ -441,6 +450,10 @@ function handleCardClick(meme: Meme): void {
     correctAnswerCount.value++
     iqScore.value += getCorrectPickPoints()
   }
+  stageResults.value.push({
+    meme: activeMeme.value,
+    isCorrect: isCorrect,
+  })
   playSoundEffect(isCorrect ? winAudio : failAudio)
 
   analytics.trackThumbnailSelect({
@@ -777,6 +790,52 @@ function handleMenuClick(): void {
 }
 
 /**
+ * Opens the review of the memes played in the match, in a history entry of its own so Back closes it.
+ */
+function handleReviewClick(): void {
+  playButtonSound()
+  analytics.trackReviewOpen(roundedIqScore.value)
+  void router.push({
+    name: 'match',
+    query: {
+      ...route.query,
+      review: null,
+    },
+    // Marks the entry as stacked on the results, since its stored previous address may be spelled differently from theirs
+    state: {
+      isReviewEntry: true,
+    },
+  })
+}
+
+/**
+ * Closes the open review without stacking a new history entry on top of it.
+ * Steps back when the review has its own entry on top of the results, so Forward can reopen it;
+ * otherwise drops the review from the address.
+ */
+function closeReview(): void {
+  if (router.options.history.state.isReviewEntry === true) {
+    router.back()
+  } else {
+    dropReviewQuery()
+  }
+}
+
+/**
+ * Removes the review from the address in place, staying on the match screen.
+ */
+function dropReviewQuery(): void {
+  const {
+    review: _review,
+    ...resultsQuery
+  } = route.query
+  void router.replace({
+    name: 'match',
+    query: resultsQuery,
+  })
+}
+
+/**
  * Leaves the match screen without stacking a new history entry on top of it.
  * Steps back when the previous entry is the destination, so Back cannot return to the match;
  * otherwise replaces the match entry.
@@ -860,6 +919,29 @@ watch(
     }
   },
 )
+
+// The review belongs to the results it was opened from, so an address that keeps it while a match runs, such as after a refresh or Forward into an old review, drops it in place
+// Stepping back instead could cross a page reload or land on an entry that no longer holds those results
+watch(
+  () => route.query.review !== undefined && !isMatchComplete.value,
+  (isReviewQueryStale) => {
+    if (isReviewQueryStale) {
+      dropReviewQuery()
+    }
+  },
+  {
+    immediate: true,
+  },
+)
+
+watch(
+  isReviewOpen,
+  (isOpen, wasOpen) => {
+    if (!isOpen && wasOpen) {
+      reviewButton.value?.focus()
+    }
+  },
+)
 </script>
 
 <template>
@@ -915,13 +997,23 @@ watch(
           </dd>
         </div>
       </dl>
-      <button
-        type="button"
-        class="action-button"
-        @click="handleMenuClick"
-      >
-        MENU
-      </button>
+      <div class="results-actions">
+        <button
+          ref="reviewButton"
+          type="button"
+          class="action-button review-button"
+          @click="handleReviewClick"
+        >
+          REVIEW
+        </button>
+        <button
+          type="button"
+          class="action-button"
+          @click="handleMenuClick"
+        >
+          MENU
+        </button>
+      </div>
     </div>
 
     <template v-else>
@@ -1034,6 +1126,13 @@ watch(
         </button>
       </div>
     </template>
+
+    <MatchReview
+      :is-open="isReviewOpen"
+      :stage-results="stageResults"
+      @close="closeReview"
+      @play="stopSoundEffects"
+    />
 
     <PauseDialog
       :is-open="isPauseOpen"
@@ -1258,7 +1357,10 @@ watch(
   text-transform: none;
 }
 
-.results .action-button {
+.results-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
   margin-top: 2rem;
 }
 
@@ -1436,6 +1538,14 @@ watch(
   color: var(--ink);
   cursor: not-allowed;
   filter: none;
+}
+
+.review-button {
+  background: var(--paper);
+}
+
+.review-button:hover:not(:disabled) {
+  filter: brightness(0.94);
 }
 
 .play-icon {

@@ -64,6 +64,16 @@ export interface MatchCompleteParams {
 }
 
 /**
+ * Parameters for tracking a clip played from the match review.
+ */
+export interface ReviewAudioPlayParams {
+  videoId: string
+  videoName: string
+  result: 'success' | 'failure'
+  stageNumber: number
+}
+
+/**
  * Parameters for tracking a match the player left before finishing.
  */
 export interface MatchLeaveParams {
@@ -298,6 +308,29 @@ export class AnalyticsService {
   trackResultsMenuClick(iqScore: number): void {
     this.log('results_menu_click', {
       iq_score: iqScore,
+    })
+  }
+
+  /**
+   * Tracks when the player opens the review of the memes played in the match.
+   * @param iqScore - Final IQ score of the match.
+   */
+  trackReviewOpen(iqScore: number): void {
+    this.log('review_open', {
+      iq_score: iqScore,
+    })
+  }
+
+  /**
+   * Tracks when the player plays a meme's clip from the match review.
+   * @param params - Video details, whether the player picked it in its stage, and the stage it played in.
+   */
+  trackReviewAudioPlay(params: ReviewAudioPlayParams): void {
+    this.log('review_audio_play', {
+      video_id: params.videoId,
+      video_name: params.videoName,
+      result: params.result,
+      stage_number: params.stageNumber,
     })
   }
 
